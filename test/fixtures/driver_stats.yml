@@ -1,0 +1,17 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  user: one
+  total_deliveries: 1
+  total_earnings: 9.99
+  average_rating: 9.99
+  total_ratings: 1
+  date: 2025-07-25
+
+two:
+  user: two
+  total_deliveries: 1
+  total_earnings: 9.99
+  average_rating: 9.99
+  total_ratings: 1
+  date: 2025-07-25
