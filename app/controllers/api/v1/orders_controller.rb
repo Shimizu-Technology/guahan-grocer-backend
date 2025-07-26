@@ -4,7 +4,7 @@ class Api::V1::OrdersController < ApplicationController
   # GET /api/v1/orders
   def index
     @orders = orders_scope.includes(:user, :driver, :order_items, :products)
-    render json: @orders.map { |order| order_json(order) }
+    render json: @orders.map { |order| order_json(order, include_items: true) }
   end
 
   # GET /api/v1/orders/:id

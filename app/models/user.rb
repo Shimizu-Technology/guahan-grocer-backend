@@ -11,9 +11,18 @@ class User < ApplicationRecord
   # Role enum as specified in the plan
   enum :role, { customer: 0, driver: 1, admin: 2 }
 
+  # Email normalization
+  before_save :normalize_email
+
   # Basic validations
   validates :email, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :name, presence: true
   validates :phone, presence: true, format: { with: /\A[\+]?[0-9\-\(\)\s]+\z/ }
   validates :role, presence: true
+
+  private
+
+  def normalize_email
+    self.email = email.downcase.strip if email.present?
+  end
 end

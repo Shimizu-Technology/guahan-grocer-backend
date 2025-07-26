@@ -14,7 +14,13 @@ Rails.application.routes.draw do
       end
 
       # Core resource routes
-      resources :products
+      resources :products do
+        member do
+          post :upload_image, to: 'products#upload_image'
+          delete :delete_image, to: 'products#delete_image'
+        end
+      end
+      
       resources :orders do
         member do
           put :assign_driver
@@ -46,6 +52,11 @@ Rails.application.routes.draw do
 
       # Driver stats
       resources :driver_stats, only: [:index, :show], param: :date
+
+      # Admin routes
+      namespace :admin do
+        get :dashboard
+      end
     end
   end
 

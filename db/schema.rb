@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_25_105852) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_26_001540) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -78,7 +78,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_25_105852) do
     t.text "description"
     t.boolean "in_stock", default: true
     t.integer "stock_quantity", default: 0
-    t.string "image_key"
+    t.string "image_url"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["category", "in_stock"], name: "index_products_on_category_and_in_stock"

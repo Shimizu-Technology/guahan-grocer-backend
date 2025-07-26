@@ -47,17 +47,13 @@ class Api::V1::FavoritesController < ApplicationController
         price: product.price.to_f,
         unit: product.unit,
         description: product.description,
-        imageUrl: product.image_key ? generate_image_url(product.image_key) : nil,
+        imageUrl: product.image_url,
+        images: product.image_info,
         inStock: product.in_stock,
-        stockQuantity: product.stock_quantity
+        stockQuantity: product.stock_quantity,
+        hasImage: product.has_image?
       },
       createdAt: favorite.created_at.iso8601
     }
-  end
-
-  def generate_image_url(image_key)
-    # For now, return a placeholder. Later we'll integrate with Imgix
-    return nil if image_key.blank?
-    "https://placeholder-image-url/#{image_key}"
   end
 end 

@@ -3,7 +3,9 @@ class Api::V1::AuthController < ApplicationController
 
   # POST /api/v1/auth/login
   def login
-    user = User.find_by(email: params[:email])
+    # Normalize email for case-insensitive lookup
+    normalized_email = params[:email].downcase.strip if params[:email].present?
+    user = User.find_by(email: normalized_email)
     
     if user&.authenticate(params[:password])
       if user.active?

@@ -29,6 +29,9 @@ gem "image_processing", "~> 1.2"
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 gem "rack-cors"
 
+# MIME type detection for file uploads
+gem "marcel"
+
 # Authentication & Authorization
 gem "jwt" # JWT token authentication
 
