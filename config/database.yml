@@ -79,20 +79,9 @@ test:
 # for a full overview on how database connection configuration can be specified.
 #
 production:
-  primary: &primary_production
-    <<: *default
-    database: guahan_grocer_backend_production
-    username: guahan_grocer_backend
-    password: <%= ENV["GUAHAN_GROCER_BACKEND_DATABASE_PASSWORD"] %>
-  cache:
-    <<: *primary_production
-    database: guahan_grocer_backend_production_cache
-    migrations_paths: db/cache_migrate
-  queue:
-    <<: *primary_production
-    database: guahan_grocer_backend_production_queue
-    migrations_paths: db/queue_migrate
-  cable:
-    <<: *primary_production
-    database: guahan_grocer_backend_production_cable
-    migrations_paths: db/cable_migrate
+  adapter: postgresql
+  encoding: unicode
+  url: <%= ENV["DATABASE_URL"] %>
+  # Increased pool size to handle 4000-5000 concurrent users
+  # Can be configured via DB_POOL environment variable
+  pool: <%= ENV.fetch("DB_POOL") { 30 } %>
