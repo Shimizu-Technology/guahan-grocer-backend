@@ -10,9 +10,21 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_26_001540) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_26_083456) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "categories", force: :cascade do |t|
+    t.string "name", null: false
+    t.text "description"
+    t.boolean "active", default: true
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "icon"
+    t.string "color"
+    t.index ["active", "name"], name: "index_categories_on_active_and_name"
+    t.index ["name"], name: "index_categories_on_name", unique: true
+  end
 
   create_table "driver_stats", force: :cascade do |t|
     t.bigint "user_id", null: false
@@ -70,19 +82,29 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_26_001540) do
     t.index ["user_id"], name: "index_orders_on_user_id"
   end
 
+  create_table "product_categories", force: :cascade do |t|
+    t.bigint "product_id", null: false
+    t.bigint "category_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["category_id"], name: "index_product_categories_on_category_id"
+    t.index ["product_id", "category_id"], name: "index_product_categories_on_product_id_and_category_id", unique: true
+    t.index ["product_id"], name: "index_product_categories_on_product_id"
+  end
+
   create_table "products", force: :cascade do |t|
     t.string "name"
-    t.string "category"
     t.decimal "price", precision: 8, scale: 2
-    t.string "unit"
     t.text "description"
     t.boolean "in_stock", default: true
     t.integer "stock_quantity", default: 0
     t.string "image_url"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["category", "in_stock"], name: "index_products_on_category_and_in_stock"
+    t.bigint "unit_id", null: false
+    t.boolean "featured", default: false
     t.index ["stock_quantity"], name: "index_products_on_stock_quantity", where: "(stock_quantity <= 10)"
+    t.index ["unit_id"], name: "index_products_on_unit_id"
   end
 
   create_table "sms_messages", force: :cascade do |t|
@@ -92,6 +114,17 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_26_001540) do
     t.datetime "sent_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "units", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "symbol", null: false
+    t.boolean "active", default: true
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["active", "name"], name: "index_units_on_active_and_name"
+    t.index ["name"], name: "index_units_on_name", unique: true
+    t.index ["symbol"], name: "index_units_on_symbol", unique: true
   end
 
   create_table "users", force: :cascade do |t|
@@ -115,4 +148,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_26_001540) do
   add_foreign_key "order_items", "products", column: "substitute_product_id"
   add_foreign_key "orders", "users"
   add_foreign_key "orders", "users", column: "driver_id"
+  add_foreign_key "product_categories", "categories"
+  add_foreign_key "product_categories", "products"
+  add_foreign_key "products", "units"
 end

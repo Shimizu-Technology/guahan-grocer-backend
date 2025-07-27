@@ -1,18 +1,20 @@
 class Product < ApplicationRecord
   # Validations
   validates :name, presence: true
-  validates :category, presence: true
   validates :price, presence: true, numericality: { greater_than: 0 }
-  validates :unit, presence: true
   validates :stock_quantity, presence: true, numericality: { greater_than_or_equal_to: 0 }
 
-  # Associations as specified in the plan
+  # Associations
+  belongs_to :unit
   has_many :order_items, dependent: :destroy
   has_many :favorites, dependent: :destroy
+  has_many :product_categories, dependent: :destroy
+  has_many :categories, through: :product_categories
 
   # Scopes for easier querying
   scope :in_stock, -> { where(in_stock: true) }
-  scope :by_category, ->(category) { where(category: category) if category.present? }
+  scope :by_category, ->(category_name) { joins(:categories).where(categories: { name: category_name }) if category_name.present? }
+  scope :by_categories, ->(category_names) { joins(:categories).where(categories: { name: category_names }) if category_names.present? }
   scope :low_stock, -> { where('stock_quantity <= ?', 10) }
 
   # Image handling methods

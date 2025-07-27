@@ -2,7 +2,7 @@ class Api::V1::ProductsController < ApplicationController
   before_action :set_product, only: [:show, :update, :destroy, :upload_image, :delete_image]
   
   # Skip authentication for public product viewing
-  skip_before_action :authenticate_user!, only: [:index, :show]
+  skip_before_action :authenticate_user!, only: [:index, :show, :featured]
 
   # GET /api/v1/products
   def index
@@ -17,6 +17,12 @@ class Api::V1::ProductsController < ApplicationController
     render json: @products.map { |product| product_json(product) }
   end
 
+  # GET /api/v1/products/featured
+  def featured
+    @products = Product.where(featured: true).in_stock
+    render json: @products.map { |product| product_json(product) }
+  end
+
   # GET /api/v1/products/:id
   def show
     render json: product_json(@product, detailed: true)
@@ -27,9 +33,14 @@ class Api::V1::ProductsController < ApplicationController
     ensure_admin!
     return if performed?
 
-    @product = Product.new(product_params)
+    @product = Product.new(product_params.except(:category_ids))
     
     if @product.save
+      # Handle category associations
+      if params[:product][:category_ids].present?
+        @product.category_ids = params[:product][:category_ids]
+      end
+      
       # Handle image upload if provided
       if params[:image].present?
         begin
@@ -129,18 +140,22 @@ class Api::V1::ProductsController < ApplicationController
   end
 
   def product_params
-    params.require(:product).permit(:name, :category, :price, :unit, :description, :in_stock, :stock_quantity)
+    params.require(:product).permit(:name, :price, :unit_id, :description, :in_stock, :stock_quantity, :featured, category_ids: [])
   end
 
   def product_json(product, detailed: false)
     json = {
       id: product.id.to_s,
       name: product.name,
-      category: product.category,
+      categories: product.categories.map { |cat| { id: cat.id, name: cat.name } },
+      category: product.categories.first&.name, # For backward compatibility
       price: product.price.to_f,
-      unit: product.unit,
+      unit: product.unit.name,
+      unitId: product.unit_id,
+      unitSymbol: product.unit.symbol,
       inStock: product.in_stock?,
-      stockQuantity: product.stock_quantity
+      stockQuantity: product.stock_quantity,
+      featured: product.featured
     }
 
     # Add image information

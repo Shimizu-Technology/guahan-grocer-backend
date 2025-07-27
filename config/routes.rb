@@ -5,6 +5,9 @@ Rails.application.routes.draw do
   # API v1 routes
   namespace :api do
     namespace :v1 do
+      # Categories and Units management
+      resources :categories, only: [:index, :create, :show, :update, :destroy]
+      resources :units, only: [:index, :create, :show, :update, :destroy]
       # Authentication routes
       namespace :auth do
         post :login
@@ -15,6 +18,9 @@ Rails.application.routes.draw do
 
       # Core resource routes
       resources :products do
+        collection do
+          get :featured
+        end
         member do
           post :upload_image, to: 'products#upload_image'
           delete :delete_image, to: 'products#delete_image'

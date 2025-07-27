@@ -43,9 +43,12 @@ class Api::V1::FavoritesController < ApplicationController
       product: {
         id: product.id.to_s,
         name: product.name,
-        category: product.category,
+        categories: product.categories.map { |cat| { id: cat.id, name: cat.name } },
+        category: product.categories.first&.name, # For backward compatibility
         price: product.price.to_f,
-        unit: product.unit,
+        unit: product.unit.name,
+        unitId: product.unit_id,
+        unitSymbol: product.unit.symbol,
         description: product.description,
         imageUrl: product.image_url,
         images: product.image_info,
