@@ -10,7 +10,8 @@ class Api::V1::ProductsController < ApplicationController
     
     # Apply filters
     @products = @products.by_category(params[:category]) if params[:category].present?
-    @products = @products.in_stock if params[:in_stock] == 'true'
+    @products = @products.available if params[:available] == 'true'
+    @products = @products.in_stock if params[:in_stock] == 'true'  # Keep for backward compatibility
     @products = @products.low_stock if params[:low_stock] == 'true'
     
     # Include image URLs for all products
@@ -19,7 +20,7 @@ class Api::V1::ProductsController < ApplicationController
 
   # GET /api/v1/products/featured
   def featured
-    @products = Product.where(featured: true).in_stock
+    @products = Product.where(featured: true).available
     render json: @products.map { |product| product_json(product) }
   end
 
@@ -33,7 +34,11 @@ class Api::V1::ProductsController < ApplicationController
     ensure_admin!
     return if performed?
 
-    @product = Product.new(product_params.except(:category_ids))
+    # Extract image from params before creating product
+    image_file = product_params[:image]
+    product_attributes = product_params.except(:category_ids, :image)
+    
+    @product = Product.new(product_attributes)
     
     if @product.save
       # Handle category associations
@@ -42,17 +47,26 @@ class Api::V1::ProductsController < ApplicationController
       end
       
       # Handle image upload if provided
-      if params[:image].present?
+      image_upload_error = nil
+      if image_file.present?
         begin
-          upload_result = @product.upload_image(params[:image])
+          upload_result = @product.upload_image(image_file)
           Rails.logger.info "Image uploaded for product #{@product.id}: #{upload_result[:s3_key]}"
+        rescue S3Uploader::ConfigurationError => e
+          Rails.logger.warn "S3 not configured for product #{@product.id}: #{e.message}"
+          # For development: save a placeholder image URL
+          @product.update(image_url: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300')
+          Rails.logger.info "Using fallback image URL for development"
         rescue S3Uploader::UploadError => e
           Rails.logger.error "Image upload failed for product #{@product.id}: #{e.message}"
+          image_upload_error = e.message
           # Continue without image - don't fail the product creation
         end
       end
       
-      render json: product_json(@product, detailed: true), status: :created
+      response = product_json(@product, detailed: true)
+      response[:imageUploadError] = image_upload_error if image_upload_error
+      render json: response, status: :created
     else
       render json: { errors: @product.errors.full_messages }, status: :unprocessable_entity
     end
@@ -140,7 +154,7 @@ class Api::V1::ProductsController < ApplicationController
   end
 
   def product_params
-    params.require(:product).permit(:name, :price, :unit_id, :description, :in_stock, :stock_quantity, :featured, category_ids: [])
+    params.require(:product).permit(:name, :price, :unit_id, :description, :in_stock, :stock_quantity, :featured, :track_inventory, :image, category_ids: [])
   end
 
   def product_json(product, detailed: false)
@@ -154,8 +168,11 @@ class Api::V1::ProductsController < ApplicationController
       unitId: product.unit_id,
       unitSymbol: product.unit.symbol,
       inStock: product.in_stock?,
-      stockQuantity: product.stock_quantity,
-      featured: product.featured
+      stockQuantity: product.display_stock_quantity,
+      featured: product.featured,
+      trackInventory: product.track_inventory,
+      stockStatus: product.display_stock_status,
+      available: product.available?
     }
 
     # Add image information
@@ -174,7 +191,8 @@ class Api::V1::ProductsController < ApplicationController
         updatedAt: product.updated_at.iso8601,
         lowStock: product.low_stock?,
         outOfStock: product.out_of_stock?,
-        hasImage: product.has_image?
+        hasImage: product.has_image?,
+        actualStockQuantity: product.track_inventory? ? product.stock_quantity : nil
       })
     end
 

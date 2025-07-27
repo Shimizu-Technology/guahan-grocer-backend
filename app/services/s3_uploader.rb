@@ -13,8 +13,8 @@ class S3Uploader
     'image/webp'
   ].freeze
 
-  # Maximum file size (5MB)
-  MAX_FILE_SIZE = 5.megabytes
+  # Maximum file size (10MB)
+  MAX_FILE_SIZE = 10.megabytes
 
   # Uploads product image to S3, returning the S3 key and public URL
   def self.upload_product_image(file, product_id, original_filename = nil)
@@ -41,7 +41,7 @@ class S3Uploader
     validate_configuration!
     
     s3_client = build_s3_client
-    bucket_name = ENV["AWS_S3_BUCKET"]
+    bucket_name = ENV["AWS_S3_BUCKET"] || ENV["AWS_BUCKET"]
     
     begin
       s3_client.delete_object(bucket: bucket_name, key: s3_key)
@@ -58,7 +58,7 @@ class S3Uploader
     validate_configuration!
     
     s3_client = build_s3_client
-    bucket_name = ENV["AWS_S3_BUCKET"]
+    bucket_name = ENV["AWS_S3_BUCKET"] || ENV["AWS_BUCKET"]
     
     begin
       s3_client.head_object(bucket: bucket_name, key: s3_key)
@@ -75,7 +75,7 @@ class S3Uploader
   def self.public_url(s3_key)
     return nil if s3_key.blank?
     
-    bucket_name = ENV["AWS_S3_BUCKET"]
+    bucket_name = ENV["AWS_S3_BUCKET"] || ENV["AWS_BUCKET"]
     region = ENV["AWS_REGION"]
     
     "https://#{bucket_name}.s3.#{region}.amazonaws.com/#{s3_key}"
@@ -105,7 +105,9 @@ class S3Uploader
     
     # Check file size
     if file.size > MAX_FILE_SIZE
-      raise UploadError, "File size too large. Maximum size is #{MAX_FILE_SIZE / 1.megabyte}MB"
+      file_size_mb = (file.size / 1.megabyte.to_f).round(2)
+      max_size_mb = MAX_FILE_SIZE / 1.megabyte
+      raise UploadError, "File size too large (#{file_size_mb}MB). Maximum size is #{max_size_mb}MB"
     end
     
     # Check content type
@@ -116,8 +118,14 @@ class S3Uploader
   end
 
   def self.validate_configuration!
-    required_vars = %w[AWS_REGION AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_S3_BUCKET]
+    required_vars = %w[AWS_REGION AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY]
     missing_vars = required_vars.select { |var| ENV[var].blank? }
+    
+    # Check for bucket name (either AWS_S3_BUCKET or AWS_BUCKET)
+    bucket_name = ENV["AWS_S3_BUCKET"] || ENV["AWS_BUCKET"]
+    if bucket_name.blank?
+      missing_vars << "AWS_S3_BUCKET or AWS_BUCKET"
+    end
     
     if missing_vars.any?
       raise ConfigurationError, "Missing S3 configuration: #{missing_vars.join(', ')}"
@@ -138,7 +146,7 @@ class S3Uploader
     validate_configuration!
     
     s3_client = build_s3_client
-    bucket_name = ENV["AWS_S3_BUCKET"]
+    bucket_name = ENV["AWS_S3_BUCKET"] || ENV["AWS_BUCKET"]
     
     begin
       # Upload with proper content type (no ACL needed with bucket policy)

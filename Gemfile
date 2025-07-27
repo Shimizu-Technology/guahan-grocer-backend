@@ -54,6 +54,7 @@ group :development, :test do
   gem "debug", platforms: %i[ mri windows ]
   gem "brakeman", require: false
   gem "rubocop-rails-omakase", require: false
+  gem "dotenv-rails" # Load .env files
 end
 
 group :development do

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_26_083456) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_27_074320) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -103,7 +103,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_26_083456) do
     t.datetime "updated_at", null: false
     t.bigint "unit_id", null: false
     t.boolean "featured", default: false
+    t.boolean "track_inventory", default: true, null: false
     t.index ["stock_quantity"], name: "index_products_on_stock_quantity", where: "(stock_quantity <= 10)"
+    t.index ["track_inventory"], name: "index_products_on_track_inventory"
     t.index ["unit_id"], name: "index_products_on_unit_id"
   end
 

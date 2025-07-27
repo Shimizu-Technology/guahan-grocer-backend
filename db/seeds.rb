@@ -171,13 +171,23 @@ products_data = [
   # Snacks
   { name: 'Mixed Nuts', categories: ['Snacks'], price: 7.99, unit: 'bag', description: 'Premium mixed nuts', stock_quantity: 16, image_url: 'https://images.unsplash.com/photo-1566217796155-9d90b3c8d4d8?w=300' },
   { name: 'Potato Chips', categories: ['Snacks'], price: 3.99, unit: 'bag', description: 'Crispy potato chips', stock_quantity: 24, image_url: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=300' },
-  { name: 'Dark Chocolate', categories: ['Snacks'], price: 5.99, unit: 'bar', description: '70% dark chocolate bar', stock_quantity: 12, image_url: 'https://images.unsplash.com/photo-1481391319762-47dff72954d9?w=300' }
+  { name: 'Dark Chocolate', categories: ['Snacks'], price: 5.99, unit: 'bar', description: '70% dark chocolate bar', stock_quantity: 12, image_url: 'https://images.unsplash.com/photo-1481391319762-47dff72954d9?w=300' },
+  
+  # Non-tracked inventory products (always available)
+  { name: 'Store Pickup Service', categories: ['Beverages'], price: 0.00, unit: 'each', description: 'Free store pickup - no delivery needed', track_inventory: false, image_url: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=300' },
+  { name: 'Grocery Consultation', categories: ['Pantry'], price: 15.00, unit: 'each', description: 'Personal shopping consultation service', track_inventory: false, image_url: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=300' },
+  { name: 'Recipe Recommendations', categories: ['Pantry'], price: 5.00, unit: 'each', description: 'Personalized recipe suggestions based on your purchases', track_inventory: false, image_url: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=300' },
+  { name: 'Meal Planning Service', categories: ['Pantry'], price: 25.00, unit: 'each', description: 'Custom weekly meal planning with shopping list', track_inventory: false, image_url: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=300' }
 ]
 
-# Some items should be out of stock for testing
+# Some items should be out of stock for testing (only for tracked inventory products)
 out_of_stock_indices = [1, 8, 15, 22] # Make some items out of stock
 products_data.each_with_index do |product_data, index|
-  if out_of_stock_indices.include?(index)
+  # Non-tracked inventory products are always available
+  if product_data[:track_inventory] == false
+    product_data[:stock_quantity] = 0
+    product_data[:in_stock] = true
+  elsif out_of_stock_indices.include?(index)
     product_data[:stock_quantity] = 0
     product_data[:in_stock] = false
   else
@@ -201,10 +211,11 @@ products_data.each_with_index do |product_data, index|
     price: product_data[:price],
     unit: unit,
     description: product_data[:description],
-    stock_quantity: product_data[:stock_quantity],
+    stock_quantity: product_data[:stock_quantity] || 0,
     in_stock: product_data[:in_stock],
     image_url: product_data[:image_url],
-    featured: product_data[:featured] || false
+    featured: product_data[:featured] || false,
+    track_inventory: product_data[:track_inventory] != false  # Default to true unless explicitly false
   )
   
   # Assign categories
@@ -403,7 +414,9 @@ puts "  👥 Users: #{User.count} (#{User.customer.count} customers, #{User.driv
 puts "  📁 Categories: #{Category.count} (#{Category.pluck(:name).join(', ')})"
 puts "  📏 Units: #{Unit.count} (#{Unit.pluck(:name).join(', ')})"
 puts "  🥗 Products: #{Product.count} across #{Category.count} categories"
-puts "     📦 In Stock: #{Product.where(in_stock: true).count}"
+puts "     📦 Inventory Tracked: #{Product.where(track_inventory: true).count}"
+puts "     ♾️ Always Available: #{Product.where(track_inventory: false).count}"
+puts "     ✅ In Stock: #{Product.where(in_stock: true).count}"
 puts "     ❌ Out of Stock: #{Product.where(in_stock: false).count}"
 puts "     🔗 Product-Category Associations: #{ProductCategory.count}"
 puts "  📦 Orders: #{Order.count} orders with #{OrderItem.count} total items"

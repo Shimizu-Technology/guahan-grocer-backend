@@ -1,8 +1,9 @@
 class Product < ApplicationRecord
   # Validations
   validates :name, presence: true
-  validates :price, presence: true, numericality: { greater_than: 0 }
-  validates :stock_quantity, presence: true, numericality: { greater_than_or_equal_to: 0 }
+  validates :price, presence: true, numericality: { greater_than_or_equal_to: 0 }
+  validates :stock_quantity, presence: true, numericality: { greater_than_or_equal_to: 0 }, if: :track_inventory?
+  validates :track_inventory, inclusion: { in: [true, false] }
 
   # Associations
   belongs_to :unit
@@ -13,9 +14,15 @@ class Product < ApplicationRecord
 
   # Scopes for easier querying
   scope :in_stock, -> { where(in_stock: true) }
+  scope :available, -> { 
+    where('track_inventory = ? OR (track_inventory = ? AND in_stock = ? AND stock_quantity > ?)', 
+          false, true, true, 0)
+  }
   scope :by_category, ->(category_name) { joins(:categories).where(categories: { name: category_name }) if category_name.present? }
   scope :by_categories, ->(category_names) { joins(:categories).where(categories: { name: category_names }) if category_names.present? }
-  scope :low_stock, -> { where('stock_quantity <= ?', 10) }
+  scope :low_stock, -> { where(track_inventory: true).where('stock_quantity <= ?', 10) }
+  scope :tracked_inventory, -> { where(track_inventory: true) }
+  scope :unlimited_stock, -> { where(track_inventory: false) }
 
   # Image handling methods
   def image_url
@@ -123,19 +130,56 @@ class Product < ApplicationRecord
 
   # Stock management helpers
   def in_stock?
+    # Non-tracked inventory products are always in stock
+    return true unless track_inventory?
+    
     in_stock && stock_quantity > 0
   end
 
   def low_stock?
+    # Non-tracked inventory products are never low stock
+    return false unless track_inventory?
+    
     stock_quantity <= 10
   end
 
   def out_of_stock?
+    # Non-tracked inventory products are never out of stock
+    return false unless track_inventory?
+    
     !in_stock || stock_quantity <= 0
+  end
+
+  def available?
+    # Non-tracked inventory products are always available
+    return true unless track_inventory?
+    
+    in_stock?
+  end
+
+  def display_stock_status
+    return 'Always Available' unless track_inventory?
+    
+    if out_of_stock?
+      'Out of Stock'
+    elsif low_stock?
+      'Low Stock'
+    else
+      'In Stock'
+    end
+  end
+
+  def display_stock_quantity
+    return nil unless track_inventory?
+    
+    stock_quantity
   end
 
   # Update stock after order item is processed
   def reduce_stock!(quantity)
+    # Skip stock reduction for non-tracked inventory products
+    return true unless track_inventory?
+    
     return false if quantity > stock_quantity
     
     new_quantity = stock_quantity - quantity
@@ -146,9 +190,23 @@ class Product < ApplicationRecord
   end
 
   def increase_stock!(quantity)
+    # Skip stock increase for non-tracked inventory products
+    return true unless track_inventory?
+    
     update!(
       stock_quantity: stock_quantity + quantity,
       in_stock: true
     )
   end
+
+  # Ensure stock_quantity is 0 for non-tracked inventory products
+  def normalize_stock_quantity
+    unless track_inventory?
+      self.stock_quantity = 0
+      self.in_stock = true
+    end
+  end
+
+  # Callbacks
+  before_save :normalize_stock_quantity
 end
