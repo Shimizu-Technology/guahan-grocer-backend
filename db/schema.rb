@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_27_074320) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_27_104544) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -76,8 +76,11 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_27_074320) do
     t.decimal "estimated_payout", precision: 8, scale: 2
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.decimal "tip_amount", precision: 8, scale: 2, default: "0.0", null: false
+    t.decimal "tip_percentage", precision: 5, scale: 2, default: "0.0", null: false
     t.index ["driver_id", "status"], name: "index_orders_on_driver_id_and_status", where: "(driver_id IS NOT NULL)"
     t.index ["driver_id"], name: "index_orders_on_driver_id"
+    t.index ["tip_amount"], name: "index_orders_on_tip_amount"
     t.index ["user_id", "status", "created_at"], name: "index_orders_on_user_id_and_status_and_created_at"
     t.index ["user_id"], name: "index_orders_on_user_id"
   end
@@ -116,6 +119,20 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_27_074320) do
     t.datetime "sent_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "stores", force: :cascade do |t|
+    t.string "name", null: false
+    t.text "address", null: false
+    t.string "phone"
+    t.decimal "latitude", precision: 10, scale: 6, null: false
+    t.decimal "longitude", precision: 10, scale: 6, null: false
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["active"], name: "index_stores_on_active"
+    t.index ["latitude", "longitude"], name: "index_stores_on_latitude_and_longitude"
+    t.index ["name"], name: "index_stores_on_name"
   end
 
   create_table "units", force: :cascade do |t|

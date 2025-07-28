@@ -249,6 +249,8 @@ order1 = Order.create!(
     zipCode: '96913'
   },
   estimated_payout: 18.50,
+  tip_amount: 3.52,
+  tip_percentage: 15,
   created_at: 30.minutes.ago
 )
 
@@ -269,6 +271,8 @@ order2 = Order.create!(
     zipCode: '96913'
   },
   estimated_payout: 22.75,
+  tip_amount: 6.39,
+  tip_percentage: 20,
   created_at: 2.hours.ago
 )
 
@@ -290,6 +294,8 @@ order3 = Order.create!(
     zipCode: '96913'
   },
   estimated_payout: 16.25,
+  tip_amount: 2.85,
+  tip_percentage: 15,
   created_at: 4.hours.ago
 )
 
@@ -310,6 +316,8 @@ order4 = Order.create!(
     zipCode: '96929'
   },
   estimated_payout: 28.50,
+  tip_amount: 8.59,
+  tip_percentage: 20,
   created_at: 1.day.ago
 )
 
@@ -329,6 +337,8 @@ order5 = Order.create!(
     zipCode: '96923'
   },
   estimated_payout: 19.75,
+  tip_amount: 4.19,
+  tip_percentage: 15,
   created_at: 15.minutes.ago
 )
 
@@ -427,6 +437,84 @@ puts "     ✅ Delivered: #{Order.where(status: 'delivered').count}"
 puts "  ❤️ Favorites: #{Favorite.count}"
 puts "  📊 Driver Stats: #{DriverStat.count} records"
 puts ""
+# Create stores
+puts "🏪 Creating stores..."
+
+stores_data = [
+  {
+    name: "Micronesia Mall Pay‑Less",
+    address: "1088 W Marine Corps Drive, Dededo, GU 96929",
+    phone: "+1-671-637‑7233", 
+    latitude: 13.519410,
+    longitude: 144.817290,
+    active: true
+  },
+  {
+    name: "Maite Pay‑Less",
+    address: "751 Chalan Machaute, Maite, GU 96910",
+    phone: "+1-671-477‑7006",
+    latitude: 13.4625,
+    longitude: 144.7392,
+    active: true
+  },
+  {
+    name: "Dededo Pay‑Less",
+    address: "214 West Marine Drive (Route 1), Dededo, GU 96929",
+    phone: "+1-671-632‑9419",
+    latitude: 13.513611,
+    longitude: 144.837222,
+    active: true
+  },
+  {
+    name: "Mangilao Pay‑Less",
+    address: "121 Jesus Mariano Street, Mangilao, GU 96913",
+    phone: "+1-671-735‑0651",
+    latitude: 13.437530,
+    longitude: 144.794391,
+    active: true
+  },
+  {
+    name: "Oka Pay‑Less",
+    address: "445 Gov Carlos G Camacho Rd, Oka, 96913, Guam",
+    phone: "+1-671-646‑9301",
+    latitude: 13.498136,
+    longitude: 144.776348,
+    active: true
+  },
+  {
+    name: "Sinajaña Pay‑Less",
+    address: "128 Pale Kieran Hickey Drive, Sinajana, GU 96910",
+    phone: "+1-671-477‑7155",
+    latitude: 13.46033913689201,
+    longitude: 144.75762498431874,
+    active: true
+  },
+  {
+    name: "Sumay Pay‑Less",
+    address: "137 Pedro LG Roberto Dr. (Rte 5), Santa Rita, GU 96915",
+    phone: "+1-671-565‑1330",
+    latitude: 13.409793850565652,
+    longitude: 144.67734577848432,
+    active: true
+  },
+  {
+    name: "Yigo Pay‑Less",
+    address: "525 Chalan Ramon Haya, Yigo, GU 96929",
+    phone: "+1-671-653‑5410",
+    latitude: 13.524350,
+    longitude: 144.883100,
+    active: true
+  }
+]
+
+stores_data.each do |store_attrs|
+  Store.find_or_create_by(name: store_attrs[:name]) do |store|
+    store.assign_attributes(store_attrs)
+  end
+end
+
+puts "Created #{Store.count} stores across all of Guam"
+
 puts "🧪 Test with these credentials:"
 puts "  👤 Customer: customer@example.com / password"
 puts "  🚚 Driver: driver@example.com / password"  
@@ -434,3 +522,4 @@ puts "  👑 Admin: admin@example.com / password"
 puts ""
 puts "🏪 Browse categories: #{Category.pluck(:name).join(', ')}"
 puts "📏 Available units: #{Unit.pluck(:name).join(', ')}"
+puts "🏬 Available stores: #{Store.count} Pay-Less locations across Guam"

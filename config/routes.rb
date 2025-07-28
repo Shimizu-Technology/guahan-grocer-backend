@@ -34,6 +34,7 @@ Rails.application.routes.draw do
         end
         collection do
           get :available
+          post :calculate_delivery_fee
         end
       end
 
@@ -58,6 +59,13 @@ Rails.application.routes.draw do
 
       # Driver stats
       resources :driver_stats, only: [:index, :show], param: :date
+
+      # Stores management
+      resources :stores do
+        member do
+          put :toggle_active
+        end
+      end
 
       # Admin routes
       namespace :admin do

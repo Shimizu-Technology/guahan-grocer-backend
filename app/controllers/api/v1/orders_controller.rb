@@ -71,6 +71,53 @@ class Api::V1::OrdersController < ApplicationController
     render json: @orders.map { |order| order_json(order) }
   end
 
+  # POST /api/v1/orders/calculate_delivery_fee
+  def calculate_delivery_fee
+    delivery_address = params[:delivery_address]
+    
+    unless delivery_address.present?
+      render json: { errors: ['Delivery address is required'] }, status: :bad_request
+      return
+    end
+
+    # Format address string
+    address_string = format_delivery_address(delivery_address)
+    
+    # Apply address correction if needed
+    correction_result = DistanceCalculator.get_corrected_address(address_string)
+    final_address = correction_result[:corrected_address]
+    
+    # Calculate delivery details using efficient single-call method
+    delivery_result = DistanceCalculator.calculate_delivery_with_details(final_address)
+    
+    # Prepare response data
+    response_data = {
+      delivery_fee: delivery_result[:delivery_fee],
+      closest_store: delivery_result[:closest_store]&.name,
+      distance_details: delivery_result[:distance_details]
+    }
+    
+    # Handle address not found error
+    unless delivery_result[:success]
+      response_data[:address_error] = {
+        message: delivery_result[:error],
+        suggestion: "Please check your address and try again, or try using just the village name (e.g., 'Yona, GU 96914')"
+      }
+    end
+    
+    # Add address correction notice if correction was applied
+    if correction_result[:correction_applied]
+      response_data[:address_correction] = {
+        original_address: correction_result[:original_address],
+        corrected_address: correction_result[:corrected_address],
+        reason: correction_result[:reason],
+        message: "We've automatically corrected your address for accurate delivery calculation."
+      }
+    end
+    
+    render json: response_data
+  end
+
   private
 
   def set_order
@@ -80,7 +127,7 @@ class Api::V1::OrdersController < ApplicationController
   end
 
   def order_params
-    params.require(:order).permit(:total, :eta, :estimated_payout, delivery_address: {})
+    params.require(:order).permit(:total, :eta, :estimated_payout, :tip_amount, :tip_percentage, delivery_address: {})
   end
 
   def create_order_items(order, items_data)
@@ -104,7 +151,9 @@ class Api::V1::OrdersController < ApplicationController
       createdAt: order.created_at.iso8601,
       deliveryAddress: order.delivery_address,
       eta: order.eta,
-      estimatedPayout: order.estimated_payout&.to_f
+      estimatedPayout: order.estimated_payout&.to_f,
+      tipAmount: order.tip_amount.to_f,
+      tipPercentage: order.tip_percentage.to_f
     }
     
     if include_items
@@ -133,5 +182,24 @@ class Api::V1::OrdersController < ApplicationController
       notes: order_item.notes,
       substituteItem: order_item.substitute_product&.id&.to_s
     }
+  end
+
+  def format_delivery_address(delivery_address)
+    case delivery_address
+    when String
+      delivery_address
+    when Hash
+      # Build address string from components
+      address_parts = []
+      address_parts << delivery_address[:streetAddress] if delivery_address[:streetAddress].present?
+      address_parts << delivery_address[:apartmentUnit] if delivery_address[:apartmentUnit].present?
+      address_parts << delivery_address[:city] if delivery_address[:city].present?
+      address_parts << delivery_address[:state] if delivery_address[:state].present?
+      address_parts << delivery_address[:zipCode] if delivery_address[:zipCode].present?
+      
+      address_parts.join(', ')
+    else
+      delivery_address.to_s
+    end
   end
 end 
