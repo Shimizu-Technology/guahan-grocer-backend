@@ -28,7 +28,7 @@ Rails.application.config.middleware.insert_before 0, Rack::Cors do
     allow do
       origins(
         'https://guahan-grocer.expo.app',
-        'https://guahan-grocer-app.vercel.app' # Example production URL
+        'https://guahan-grocer.netlify.app'
       )
       
       resource "*",
