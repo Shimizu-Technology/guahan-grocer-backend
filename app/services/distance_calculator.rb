@@ -103,6 +103,13 @@ class DistanceCalculator
     def calculate_distance(origin, destination)
       return nil unless GOOGLE_MAPS_API_KEY.present?
 
+      # Create cache key based on normalized addresses
+      cache_key = "distance_calc:#{normalize_address(origin)}:#{normalize_address(destination)}"
+      
+      # Try to get from cache first (24 hour expiry)
+      cached_result = Rails.cache.read(cache_key)
+      return cached_result if cached_result
+
       begin
         response = get('/distancematrix/json', {
           query: {
@@ -118,12 +125,16 @@ class DistanceCalculator
           element = response.dig('rows', 0, 'elements', 0)
           
           if element && element['status'] == 'OK'
-            {
+            result = {
               distance_miles: meters_to_miles(element.dig('distance', 'value')),
               duration_minutes: seconds_to_minutes(element.dig('duration', 'value')),
               distance_text: element.dig('distance', 'text'),
               duration_text: element.dig('duration', 'text')
             }
+            
+            # Cache the result for 24 hours
+            Rails.cache.write(cache_key, result, expires_in: 24.hours)
+            result
           else
             Rails.logger.error "Google Maps API element error: #{element}"
             nil
@@ -160,23 +171,63 @@ class DistanceCalculator
       return nil if active_stores.empty?
       return active_stores.first if active_stores.count == 1
 
-      closest_store = nil
-      shortest_distance = Float::INFINITY
+      # For Guam's geography, try to find the closest store intelligently
+      # This avoids multiple slow API calls during order creation
+      closest_store = find_closest_store_optimized(active_stores, customer_address)
+      
+      closest_store || active_stores.first
+    end
 
-      active_stores.each_with_index do |store, index|
-        # Add delay to prevent Google Maps API rate limiting (except for first request)
-        sleep(0.2) if index > 0
-        
-        distance_data = calculate_distance(store.full_address, customer_address)
-        next unless distance_data
+    # Optimized store finding that minimizes API calls
+    def find_closest_store_optimized(stores, customer_address)
+      # If we only have a few stores, check distances with caching (no artificial delays)
+      if stores.count <= 3
+        closest_store = nil
+        shortest_distance = Float::INFINITY
 
-        if distance_data[:distance_miles] < shortest_distance
-          shortest_distance = distance_data[:distance_miles]
-          closest_store = store
+        stores.each do |store|
+          distance_data = calculate_distance(store.full_address, customer_address)
+          next unless distance_data
+
+          if distance_data[:distance_miles] < shortest_distance
+            shortest_distance = distance_data[:distance_miles]
+            closest_store = store
+          end
         end
+
+        return closest_store
       end
 
-      closest_store || active_stores.first
+      # For many stores, use geographic approximation first
+      # Most Guam addresses contain village names that can help identify the closest area
+      customer_village = extract_village_from_address(customer_address)
+      
+      if customer_village
+        # Try to find a store in or near the same village
+        preferred_store = stores.find do |store|
+          store.address&.downcase&.include?(customer_village.downcase) ||
+          store.name&.downcase&.include?(customer_village.downcase)
+        end
+        
+        return preferred_store if preferred_store
+      end
+
+      # Fallback: just use the first available store
+      # The background job will calculate the accurate closest store later
+      stores.first
+    end
+
+    # Extract village name from Guam address for geographic approximation
+    def extract_village_from_address(address)
+      # Common Guam villages
+      villages = %w[
+        Agana Agat Asan Barrigada Chalan Dededo Hagatna Inarajan
+        Mangilao Merizo Mongmong Ordot Piti Santa Sinajana Tamuning
+        Toto Umatac Yigo Yona
+      ]
+      
+      address_lower = address.to_s.downcase
+      villages.find { |village| address_lower.include?(village.downcase) }
     end
 
     # Validate if distance calculation results seem reasonable for Guam geography
@@ -242,6 +293,13 @@ class DistanceCalculator
     end
 
     private
+
+    def normalize_address(address)
+      # Create a normalized version for cache keys
+      formatted = format_address(address)
+      # Remove extra spaces, convert to lowercase, remove special chars for consistent caching
+      formatted.to_s.downcase.gsub(/[^\w\s,]/, '').squeeze(' ').strip
+    end
 
     def format_address(address)
       case address

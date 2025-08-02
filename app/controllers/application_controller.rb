@@ -47,7 +47,18 @@ class ApplicationController < ActionController::API
   end
 
   def ensure_order_access!(order)
-    unless current_user&.admin? || order.user == current_user || order.driver == current_user
+    # Allow access if:
+    # - User is admin
+    # - User is the customer who placed the order
+    # - User is the assigned driver
+    # - User is a driver and order is pending with no driver assigned (available for acceptance)
+    
+    allowed = current_user&.admin? || 
+              order.user == current_user || 
+              order.driver == current_user ||
+              (current_user&.driver? && order.driver_id.nil? && order.status == 'pending')
+    
+    unless allowed
       render json: { errors: ['Not authorized to access this order'] }, status: :forbidden
     end
   end
@@ -61,7 +72,20 @@ class ApplicationController < ActionController::API
   # Scope methods that work reliably without autoloading
   def orders_scope
     return Order.all if current_user.admin?
-    return Order.where(driver: current_user).or(Order.where(driver: nil, status: 'pending')) if current_user.driver?
+    
+    if current_user.driver?
+      # Check if driver has any active orders (not completed or cancelled)
+      active_orders = Order.where(driver: current_user, status: ['accepted', 'shopping', 'delivering'])
+      
+      if active_orders.exists?
+        # Driver has active orders - only show those, no available orders
+        return active_orders
+      else
+        # Driver has no active orders - show their completed orders + available orders
+        return Order.where(driver: current_user).or(Order.where(driver: nil, status: 'pending'))
+      end
+    end
+    
     return Order.where(user: current_user) if current_user.customer?
     Order.none
   end

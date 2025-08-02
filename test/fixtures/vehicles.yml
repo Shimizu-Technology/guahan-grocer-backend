@@ -1,0 +1,23 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  user: one
+  make: MyString
+  model: MyString
+  year: 1
+  color: MyString
+  license_plate: MyString
+  vehicle_type: MyString
+  verification_status: 1
+  is_primary: false
+
+two:
+  user: two
+  make: MyString
+  model: MyString
+  year: 1
+  color: MyString
+  license_plate: MyString
+  vehicle_type: MyString
+  verification_status: 1
+  is_primary: false

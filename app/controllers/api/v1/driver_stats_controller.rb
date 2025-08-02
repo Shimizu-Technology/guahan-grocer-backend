@@ -63,7 +63,20 @@ class Api::V1::DriverStatsController < ApplicationController
       totalDeliveries: stat.total_deliveries,
       totalEarnings: stat.total_earnings.to_f,
       averageRating: stat.average_rating&.to_f,
-      totalRatings: stat.total_ratings
+      totalRatings: stat.total_ratings,
+      # Detailed earnings breakdown
+      tips: stat.tips.to_f,
+      basePay: stat.base_pay.to_f,
+      bonuses: stat.bonuses.to_f,
+      expenses: stat.expenses.to_f,
+      hoursOnline: stat.hours_online.to_f,
+      ordersOffered: stat.orders_offered,
+      ordersAccepted: stat.orders_accepted,
+      # Calculated metrics
+      acceptanceRate: stat.acceptance_rate,
+      ordersPerHour: stat.orders_per_hour,
+      hourlyRate: stat.hourly_rate,
+      netEarnings: stat.net_earnings.to_f
     }
     
     if detailed
@@ -84,6 +97,17 @@ class Api::V1::DriverStatsController < ApplicationController
       totalEarnings: 0.0,
       averageRating: nil,
       totalRatings: 0,
+      tips: 0.0,
+      basePay: 0.0,
+      bonuses: 0.0,
+      expenses: 0.0,
+      hoursOnline: 0.0,
+      ordersOffered: 0,
+      ordersAccepted: 0,
+      acceptanceRate: 0,
+      ordersPerHour: 0.0,
+      hourlyRate: 0.0,
+      netEarnings: 0.0,
       averageEarningsPerDelivery: 0.0
     }
   end

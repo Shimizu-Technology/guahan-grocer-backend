@@ -2,9 +2,22 @@ Rails.application.routes.draw do
   # Health check
   get "up" => "rails/health#show", as: :rails_health_check
 
+  # Sidekiq Web UI for monitoring background jobs (development only for security)
+  if Rails.env.development?
+    require 'sidekiq/web'
+    mount Sidekiq::Web => '/sidekiq'
+  end
+
   # API v1 routes
   namespace :api do
     namespace :v1 do
+      # Address management
+      resources :addresses do
+        member do
+          put :make_default
+        end
+      end
+      
       # Categories and Units management
       resources :categories, only: [:index, :create, :show, :update, :destroy]
       resources :units, only: [:index, :create, :show, :update, :destroy]
@@ -14,6 +27,7 @@ Rails.application.routes.draw do
         post :register
         get :me
         delete :logout
+        put :toggle_online
       end
 
       # Core resource routes
@@ -27,16 +41,19 @@ Rails.application.routes.draw do
         end
       end
       
-      resources :orders do
-        member do
-          put :assign_driver
-          put :status, to: 'orders#update_status'
+              resources :orders do
+          member do
+            put :assign_driver
+            put :status, to: 'orders#update_status'
+            put :accept, to: 'orders#accept_order'
+            post :receipt, to: 'orders#upload_receipt'
+          end
+          collection do
+            get :available
+            get :active
+            post :calculate_delivery_fee
+          end
         end
-        collection do
-          get :available
-          post :calculate_delivery_fee
-        end
-      end
 
       resources :order_items, only: [] do
         member do
@@ -59,6 +76,9 @@ Rails.application.routes.draw do
 
       # Driver stats
       resources :driver_stats, only: [:index, :show], param: :date
+
+      # Vehicle management
+      resources :vehicles
 
       # Stores management
       resources :stores do

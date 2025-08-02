@@ -23,6 +23,7 @@ class Product < ApplicationRecord
   scope :low_stock, -> { where(track_inventory: true).where('stock_quantity <= ?', 10) }
   scope :tracked_inventory, -> { where(track_inventory: true) }
   scope :unlimited_stock, -> { where(track_inventory: false) }
+  scope :featured, -> { where(featured: true) }
 
   # Image handling methods
   def image_url

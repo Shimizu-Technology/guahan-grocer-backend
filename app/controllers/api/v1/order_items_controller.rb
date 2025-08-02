@@ -70,16 +70,18 @@ class Api::V1::OrderItemsController < ApplicationController
   end
 
   def order_item_json(order_item)
+    product = order_item.product
     {
       id: order_item.id.to_s,
       orderId: order_item.order_id.to_s,
       itemId: order_item.product_id.to_s,
-      item: {
-        id: order_item.product.id.to_s,
-        name: order_item.product.name,
-        price: order_item.product.price.to_f,
-        unit: order_item.product.unit,
-        category: order_item.product.category
+      product: {
+        id: product.id.to_s,
+        name: product.name,
+        price: product.price.to_f,
+        unit: product.unit&.name || 'unit',
+        image_url: product.image_url,
+        category: product.product_categories.includes(:category).first&.category&.name || 'General'
       },
       quantity: order_item.quantity,
       price: order_item.price.to_f,
@@ -90,7 +92,7 @@ class Api::V1::OrderItemsController < ApplicationController
         id: order_item.substitute_product.id.to_s,
         name: order_item.substitute_product.name,
         price: order_item.substitute_product.price.to_f,
-        unit: order_item.substitute_product.unit
+        unit: order_item.substitute_product.unit&.name || 'unit'
       } : nil
     }
   end

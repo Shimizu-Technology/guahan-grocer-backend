@@ -27,6 +27,9 @@ class Api::V1::AuthController < ApplicationController
     user = User.new(user_params)
     user.role = 'customer' # Default role for registration
     
+    # Normalize email for case-insensitive handling
+    user.email = user.email.downcase.strip if user.email.present?
+    
     if user.save
       token = generate_token(user)
       render json: {
@@ -50,6 +53,33 @@ class Api::V1::AuthController < ApplicationController
     render json: { message: 'Logged out successfully' }, status: :ok
   end
 
+
+
+  # PUT /api/v1/auth/toggle_online
+  def toggle_online
+    unless current_user.driver?
+      render json: { errors: ['Only drivers can toggle online status'] }, status: :forbidden
+      return
+    end
+
+    if current_user.online?
+      success = current_user.go_offline!
+      message = 'You are now offline'
+    else
+      success = current_user.go_online!
+      message = 'You are now online'
+    end
+
+    if success
+      render json: { 
+        message: message, 
+        user: user_json(current_user) 
+      }, status: :ok
+    else
+      render json: { errors: ['Failed to toggle online status'] }, status: :unprocessable_entity
+    end
+  end
+
   private
 
   def user_params
@@ -70,7 +100,10 @@ class Api::V1::AuthController < ApplicationController
       id: user.id.to_s,
       email: user.email,
       name: user.name,
-      role: user.role
+      role: user.role,
+      phone: user.phone,
+      isOnline: user.is_online,
+      createdAt: user.created_at.iso8601
     }
   end
 end 

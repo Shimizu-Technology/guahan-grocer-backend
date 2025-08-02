@@ -1,0 +1,6 @@
+class AddFinancialBreakdownToOrders < ActiveRecord::Migration[8.0]
+  def change
+    add_column :orders, :subtotal, :decimal, precision: 8, scale: 2, null: false, default: 0.0
+    add_column :orders, :delivery_fee, :decimal, precision: 8, scale: 2, null: false, default: 0.0
+  end
+end

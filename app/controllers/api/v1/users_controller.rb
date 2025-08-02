@@ -30,7 +30,13 @@ class Api::V1::UsersController < ApplicationController
     ensure_admin_or_self!(@user)
     return if performed? # Stop if ensure_admin_or_self! rendered an error
     
-    if @user.update(user_update_params)
+    # Normalize email for case-insensitive handling if email is being updated
+    update_params = user_update_params
+    if update_params[:email].present?
+      update_params[:email] = update_params[:email].downcase.strip
+    end
+    
+    if @user.update(update_params)
       render json: user_json(@user, detailed: true)
     else
       render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
