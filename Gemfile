@@ -46,6 +46,9 @@ gem "stripe" # Stripe payment integration
 gem "sidekiq" # Background job processing
 gem "redis" # Sidekiq dependency
 
+# Caching
+gem "solid_cache" # Database-backed cache store
+
 # Future Auth Enhancement (Post-MVP):
 # Consider adding after MVP for social auth & advanced user management:
 # gem 'workos' # or gem 'clerk-rails'

@@ -295,6 +295,10 @@ GEM
       logger (>= 1.6.2)
       rack (>= 3.1.0)
       redis-client (>= 0.23.2)
+    solid_cache (1.0.7)
+      activejob (>= 7.2)
+      activerecord (>= 7.2)
+      railties (>= 7.2)
     stringio (3.1.7)
     stripe (15.3.0)
     thor (1.4.0)
@@ -343,6 +347,7 @@ DEPENDENCIES
   redis
   rubocop-rails-omakase
   sidekiq
+  solid_cache
   stripe
   tzinfo-data
 
