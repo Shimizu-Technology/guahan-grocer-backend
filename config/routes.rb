@@ -2,11 +2,19 @@ Rails.application.routes.draw do
   # Health check
   get "up" => "rails/health#show", as: :rails_health_check
 
-  # Sidekiq Web UI for monitoring background jobs (development only for security)
-  if Rails.env.development?
-    require 'sidekiq/web'
-    mount Sidekiq::Web => '/sidekiq'
+  # Sidekiq Web UI for monitoring background jobs
+  require 'sidekiq/web'
+  
+  # Secure Sidekiq Web UI in production with HTTP Basic Auth
+  if Rails.env.production?
+    Sidekiq::Web.use Rack::Auth::Basic do |username, password|
+      # Use environment variables for admin credentials
+      username == ENV.fetch('SIDEKIQ_USERNAME', 'admin') && 
+      password == ENV.fetch('SIDEKIQ_PASSWORD', 'change_me_in_production')
+    end
   end
+  
+  mount Sidekiq::Web => '/sidekiq'
 
   # API v1 routes
   namespace :api do
