@@ -27,7 +27,7 @@ Rails.application.config.middleware.insert_before 0, Rack::Cors do
   if Rails.env.production?
     allow do
       origins(
-        'https://your-frontend-domain.com',
+        'https://guahan-grocer.expo.app',
         'https://guahan-grocer-app.vercel.app' # Example production URL
       )
       
