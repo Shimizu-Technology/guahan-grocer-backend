@@ -12,6 +12,10 @@ class Order < ApplicationRecord
   
   # Set default status for new orders
   after_initialize :set_default_status, if: :new_record?
+  
+  # SMS notification callbacks
+  after_create :send_order_confirmation_sms
+  after_update :send_status_change_sms, if: :saved_change_to_status?
 
   # Validations
   validates :status, presence: true
@@ -52,6 +56,26 @@ class Order < ApplicationRecord
     
     unless (total - expected_total).abs <= tolerance
       errors.add(:total, "must equal subtotal + delivery fee + tip (#{expected_total.round(2)} expected, got #{total})")
+    end
+  end
+  
+  # SMS notification callback methods
+  def send_order_confirmation_sms
+    # Send confirmation SMS when order is created
+    SendOrderConfirmationJob.perform_later(id)
+  end
+  
+  def send_status_change_sms
+    case status
+    when 'accepted'
+      # Driver accepted the order
+      SendDriverAssignedJob.perform_later(id)
+    when 'delivering'
+      # Order is out for delivery
+      SendOutForDeliveryJob.perform_later(id)
+    when 'delivered'
+      # Order has been delivered
+      SendDeliveryCompleteJob.perform_later(id)
     end
   end
 end

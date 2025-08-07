@@ -12,6 +12,41 @@ class Api::V1::AdminController < ApplicationController
     }
   end
 
+  # GET /api/v1/admin/sms_report
+  def sms_report
+    spending_report = SmsCostOptimizer.daily_spending_report
+    
+    # Get recent SMS messages for debugging
+    recent_sms = SmsMessage.order(created_at: :desc)
+                          .limit(20)
+                          .select(:id, :phone, :status, :created_at, :sent_at)
+    
+    # Calculate SMS stats
+    today_start = Date.current.beginning_of_day
+    today_end = Date.current.end_of_day
+    
+    sms_stats = {
+      sent_today: SmsMessage.where(created_at: today_start..today_end, status: 'sent').count,
+      failed_today: SmsMessage.where(created_at: today_start..today_end, status: 'failed').count,
+      total_sent: SmsMessage.where(status: 'sent').count,
+      total_failed: SmsMessage.where(status: 'failed').count
+    }
+    
+    render json: {
+      spending_report: spending_report,
+      sms_stats: sms_stats,
+      recent_sms: recent_sms.map { |sms| 
+        {
+          id: sms.id,
+          phone: sms.phone.gsub(/(\d{3})\d{4}(\d{4})/, '\1****\2'), # Mask phone for privacy
+          status: sms.status,
+          created_at: sms.created_at,
+          sent_at: sms.sent_at
+        }
+      }
+    }
+  end
+
   private
 
   def calculate_dashboard_stats

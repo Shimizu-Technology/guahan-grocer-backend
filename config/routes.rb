@@ -98,6 +98,7 @@ Rails.application.routes.draw do
       # Admin routes
       namespace :admin do
         get :dashboard
+        get :sms_report
       end
     end
   end
