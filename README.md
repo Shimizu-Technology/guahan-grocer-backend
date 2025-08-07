@@ -151,3 +151,4 @@ eas submit --platform ios --latest
 - **Sidekiq Web UI**: https://guahan-grocer-backend.onrender.com/sidekiq
 - **Render Logs**: Available in Render dashboard
 - **Health Check**: https://guahan-grocer-backend.onrender.com/up
+# Force restart to apply Redis cache config
