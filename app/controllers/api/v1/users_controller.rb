@@ -25,6 +25,26 @@ class Api::V1::UsersController < ApplicationController
     render json: user_json(@user, detailed: true)
   end
 
+  # POST /api/v1/users
+  def create
+    ensure_admin!
+    return if performed? # Stop if ensure_admin! rendered an error
+    
+    # Normalize email for case-insensitive handling
+    create_params = user_create_params
+    if create_params[:email].present?
+      create_params[:email] = create_params[:email].downcase.strip
+    end
+    
+    @user = User.new(create_params)
+    
+    if @user.save
+      render json: user_json(@user, detailed: true), status: :created
+    else
+      render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
   # PUT /api/v1/users/:id
   def update
     ensure_admin_or_self!(@user)
@@ -62,6 +82,10 @@ class Api::V1::UsersController < ApplicationController
     render json: { errors: ['User not found'] }, status: :not_found
   end
 
+  def user_create_params
+    params.require(:user).permit(:name, :email, :phone, :role, :active, :password)
+  end
+
   def user_update_params
     # Admins can update more fields than regular users
     if current_user.admin?
@@ -77,20 +101,20 @@ class Api::V1::UsersController < ApplicationController
       name: user.name,
       email: user.email,
       role: user.role,
-      active: user.active
+      active: user.active,
+      createdAt: user.created_at.iso8601
     }
     
     if detailed
       json.merge!({
         phone: user.phone,
-        createdAt: user.created_at.iso8601,
         updatedAt: user.updated_at.iso8601
       })
-      
-      # Add role-specific details
-      if user.driver?
-        json[:driverStats] = latest_driver_stats(user)
-      end
+    end
+    
+    # Add driver stats for both detailed and list views
+    if user.driver?
+      json[:driverStats] = latest_driver_stats(user)
     end
     
     json

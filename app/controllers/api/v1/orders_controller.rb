@@ -69,7 +69,9 @@ class Api::V1::OrdersController < ApplicationController
     
     driver = User.driver.find(params[:driver_id])
     
-    if @order.update(driver: driver)
+    # Assign driver and move to accepted if currently pending
+    new_status = @order.status == 'pending' ? 'accepted' : @order.status
+    if @order.update(driver: driver, status: new_status)
       render json: order_json(@order)
     else
       render json: { errors: @order.errors.full_messages }, status: :unprocessable_entity
@@ -351,7 +353,8 @@ class Api::V1::OrdersController < ApplicationController
       deliveryTime: order.delivery_time,
       subtotal: order.subtotal.to_f,
       deliveryFee: order.delivery_fee.to_f,
-      actualDeliveryFee: order.actual_delivery_fee&.to_f
+      actualDeliveryFee: order.actual_delivery_fee&.to_f,
+      assigned: order.driver_id.present?
     }
     
     if include_items
@@ -360,8 +363,10 @@ class Api::V1::OrdersController < ApplicationController
       end
     end
     
-    # Add driver and vehicle information for customers when order is accepted
-    if order.driver.present? && %w[accepted shopping delivering delivered].include?(order.status)
+    # Add driver and vehicle information
+    # - For admins: always include if a driver is present (needed for assignment workflows)
+    # - For customers/drivers: include only when order is in a visible state
+    if order.driver.present? && (current_user.admin? || %w[accepted shopping delivering delivered].include?(order.status))
       json[:driver] = {
         id: order.driver.id.to_s,
         name: extract_first_name(order.driver.name), # First name only for privacy
