@@ -74,6 +74,30 @@ class Api::V1::UsersController < ApplicationController
     render json: @drivers.map { |driver| driver_json(driver) }
   end
 
+  # DELETE /api/v1/users/:id
+  def destroy
+    ensure_admin!
+    return if performed? # Stop if ensure_admin! rendered an error
+    
+    # Prevent deletion of the current admin user
+    if @user.id == current_user.id
+      render json: { errors: ['You cannot delete your own account'] }, status: :forbidden
+      return
+    end
+    
+    # Check if user has any associated records that would prevent deletion
+    if @user.orders.exists?
+      render json: { errors: ['Cannot delete user with existing orders. Consider deactivating instead.'] }, status: :unprocessable_entity
+      return
+    end
+    
+    if @user.destroy
+      render json: { message: 'User deleted successfully' }
+    else
+      render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
   private
 
   def set_user

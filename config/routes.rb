@@ -72,7 +72,7 @@ Rails.application.routes.draw do
       end
 
       # User management
-      resources :users, only: [:index, :show, :create, :update]
+      resources :users, only: [:index, :show, :create, :update, :destroy]
       get 'drivers/available', to: 'users#available_drivers'
 
       # Favorites
