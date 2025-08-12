@@ -111,6 +111,70 @@ class Order < ApplicationRecord
     timeline_events.find { |e| e.event_type == 'delivered' }&.occurred_at
   end
 
+  # Route optimization and batch delivery helpers
+  def self.suggested_delivery_order(orders)
+    return orders if orders.count <= 1
+    
+    # Simple optimization: sort by distance from store (closest first)
+    # More sophisticated routing algorithms can be added later
+    orders.sort_by do |order|
+      # Use store_distance_miles if available, otherwise treat as equal priority
+      order.store_distance_miles || 999
+    end
+  end
+
+  def delivery_coordinates
+    return nil unless delivery_address.present?
+    
+    # Extract coordinates if available in delivery_address JSON
+    if delivery_address.is_a?(Hash)
+      lat = delivery_address['lat'] || delivery_address[:lat]
+      lng = delivery_address['lng'] || delivery_address[:lng]
+      return [lat.to_f, lng.to_f] if lat && lng
+    end
+    
+    nil
+  end
+
+  def batch_info(for_driver: false)
+    return nil unless driver.present?
+    
+    batch_orders = Order.where(
+      driver: driver,
+      status: ['accepted', 'shopping', 'delivering']
+    ).includes(:user).order(:created_at)
+    
+    return nil if batch_orders.count <= 1
+    
+    total_earnings = batch_orders.sum(:estimated_payout)
+    suggested_order = Order.suggested_delivery_order(batch_orders)
+    current_index = suggested_order.index(self)
+    
+    {
+      total_orders: batch_orders.count,
+      total_earnings: total_earnings.round(2),
+      current_order_index: current_index ? current_index + 1 : nil,
+      other_orders: batch_orders.where.not(id: id).map do |other_order|
+        {
+          id: other_order.id,
+          customer_name: other_order.user.name.split.first,
+          status: other_order.status,
+          estimated_payout: (other_order.estimated_payout || 0).round(2),
+          distance: other_order.store_distance_miles&.round(1)
+        }
+      end,
+      suggested_delivery_order: suggested_order.map.with_index do |suggested_order, index|
+        {
+          order_id: suggested_order.id,
+          position: index + 1,
+          customer_name: suggested_order.user.name.split.first,
+          is_current_order: suggested_order.id == id,
+          distance: suggested_order.store_distance_miles&.round(1)
+        }
+      end
+    }
+  end
+
   private
 
   def set_default_status

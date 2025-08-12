@@ -80,6 +80,56 @@ class Api::V1::OrdersController < ApplicationController
     render json: { errors: ['Driver not found'] }, status: :not_found
   end
 
+  # POST /api/v1/orders/batch_assign
+  def batch_assign
+    ensure_admin!
+    return if performed? # Stop if ensure_admin! rendered an error
+    
+    order_ids = params[:order_ids] || []
+    driver_id = params[:driver_id]
+    
+    if order_ids.empty?
+      render json: { errors: ['No orders selected'] }, status: :bad_request
+      return
+    end
+    
+    driver = User.driver.find(driver_id)
+    orders = Order.where(id: order_ids, status: 'pending', driver: nil)
+    
+    if orders.count != order_ids.count
+      unavailable_count = order_ids.count - orders.count
+      render json: { 
+        errors: ["#{unavailable_count} order(s) are no longer available for assignment"] 
+      }, status: :unprocessable_entity
+      return
+    end
+    
+    # Batch assign all orders
+    success_count = 0
+    total_earnings = 0
+    orders.each do |order|
+      if order.update(driver: driver, status: 'accepted')
+        success_count += 1
+        total_earnings += order.estimated_payout || 0
+      end
+    end
+    
+    if success_count == orders.count
+      render json: { 
+        message: "#{success_count} orders assigned to #{driver.name}",
+        total_earnings: total_earnings.round(2),
+        batch_size: success_count,
+        orders: orders.map { |order| order_json(order) }
+      }
+    else
+      render json: { 
+        errors: ['Some orders failed to assign. Please try again.'] 
+      }, status: :internal_server_error
+    end
+  rescue ActiveRecord::RecordNotFound
+    render json: { errors: ['Driver not found'] }, status: :not_found
+  end
+
   # GET /api/v1/orders/available
   def available
     ensure_driver!
@@ -476,6 +526,36 @@ class Api::V1::OrdersController < ApplicationController
           totalProcessingTime: order.total_processing_time,
           shoppingDuration: order.shopping_duration,
           deliveryDuration: order.delivery_duration
+        }
+      end
+    end
+
+    # Add batch information for drivers with multiple active orders
+    if for_driver && order.driver.present?
+      batch_info = order.batch_info(for_driver: true)
+      if batch_info
+        json[:batchInfo] = {
+          totalOrders: batch_info[:total_orders],
+          totalEarnings: batch_info[:total_earnings],
+          currentOrderIndex: batch_info[:current_order_index],
+          otherOrders: batch_info[:other_orders].map do |other_order|
+            {
+              id: other_order[:id].to_s,
+              customerName: other_order[:customer_name],
+              status: other_order[:status],
+              estimatedPayout: other_order[:estimated_payout],
+              distance: other_order[:distance]
+            }
+          end,
+          suggestedDeliveryOrder: batch_info[:suggested_delivery_order].map do |order_info|
+            {
+              orderId: order_info[:order_id].to_s,
+              position: order_info[:position],
+              customerName: order_info[:customer_name],
+              isCurrentOrder: order_info[:is_current_order],
+              distance: order_info[:distance]
+            }
+          end
         }
       end
     end

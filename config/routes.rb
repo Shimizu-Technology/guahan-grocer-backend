@@ -61,6 +61,7 @@ Rails.application.routes.draw do
             get :available
             get :active
             post :calculate_delivery_fee
+            post :batch_assign
           end
         end
 
