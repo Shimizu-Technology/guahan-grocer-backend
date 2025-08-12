@@ -70,7 +70,9 @@ class Api::V1::AdminController < ApplicationController
                          .round(2),
       orders_today: Order.where(created_at: today_start..today_end).count,
       pending_orders: Order.where(status: 'pending').count,
-      low_stock_products: Product.where('stock_quantity <= ?', 10).count
+      low_stock_products: Product.where('stock_quantity <= ?', 10)
+                                .where(track_inventory: true)
+                                .count
     }
   end
 
@@ -105,9 +107,10 @@ class Api::V1::AdminController < ApplicationController
       }
     end
 
-    # Low stock alerts
+    # Low stock alerts (only for products with inventory tracking enabled)
     low_stock = Product.where('stock_quantity <= ?', 10)
                       .where(in_stock: true)
+                      .where(track_inventory: true)
                       .limit(3)
     
     low_stock.each do |product|
