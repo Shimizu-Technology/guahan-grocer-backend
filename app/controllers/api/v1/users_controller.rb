@@ -89,9 +89,9 @@ class Api::V1::UsersController < ApplicationController
   def user_update_params
     # Admins can update more fields than regular users
     if current_user.admin?
-      params.require(:user).permit(:name, :email, :phone, :role, :active)
+      params.require(:user).permit(:name, :email, :phone, :role, :active, :password)
     else
-      params.require(:user).permit(:name, :email, :phone)
+      params.require(:user).permit(:name, :email, :phone, :password)
     end
   end
 
