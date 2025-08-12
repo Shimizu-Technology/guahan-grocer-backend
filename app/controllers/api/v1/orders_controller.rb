@@ -1,5 +1,5 @@
 class Api::V1::OrdersController < ApplicationController
-  before_action :set_order, only: [:show, :update_status, :assign_driver, :accept_order]
+  before_action :set_order, only: [:show, :update_status, :assign_driver, :accept_order, :timeline, :upload_receipt]
 
   # GET /api/v1/orders
   def index
@@ -69,6 +69,12 @@ class Api::V1::OrdersController < ApplicationController
     
     driver = User.driver.find(params[:driver_id])
     
+    # Store admin info for event tracking
+    @assigning_admin = current_user
+    
+    # Pass admin context to the order for event tracking
+    @order.instance_variable_set(:@assigning_admin, @assigning_admin)
+    
     # Assign driver and move to accepted if currently pending
     new_status = @order.status == 'pending' ? 'accepted' : @order.status
     if @order.update(driver: driver, status: new_status)
@@ -104,10 +110,15 @@ class Api::V1::OrdersController < ApplicationController
       return
     end
     
+    # Store admin info for event tracking
+    @assigning_admin = current_user
+    
     # Batch assign all orders
     success_count = 0
     total_earnings = 0
     orders.each do |order|
+      # Set the admin context for this order's assignment event
+      order.instance_variable_set(:@assigning_admin, @assigning_admin)
       if order.update(driver: driver, status: 'accepted')
         success_count += 1
         total_earnings += order.estimated_payout || 0
@@ -286,7 +297,6 @@ class Api::V1::OrdersController < ApplicationController
 
   # POST /api/v1/orders/:id/receipt
   def upload_receipt
-    set_order
     ensure_order_management!(@order)
     return if performed? # Stop if ensure_order_management! rendered an error
 
@@ -315,6 +325,15 @@ class Api::V1::OrdersController < ApplicationController
         receipt_url: upload_result[:s3_key],
         receipt_uploaded_at: Time.current
       )
+      
+      # Add receipt upload event to timeline
+      @order.add_event('receipt_uploaded', current_user, nil, {
+        driver_name: current_user.name,
+        receipt_filename: params[:receipt].original_filename,
+        s3_key: upload_result[:s3_key],
+        file_size: params[:receipt].size,
+        upload_type: 'driver_action'
+      })
       
       render json: {
         message: 'Receipt uploaded successfully',
@@ -525,8 +544,27 @@ class Api::V1::OrdersController < ApplicationController
         json[:performanceMetrics] = {
           totalProcessingTime: order.total_processing_time,
           shoppingDuration: order.shopping_duration,
-          deliveryDuration: order.delivery_duration
+          deliveryDuration: order.delivery_duration,
+          assignmentToAcceptanceTime: order.assignment_to_acceptance_time,
+          acceptanceToShoppingTime: order.acceptance_to_shopping_time,
+          shoppingToDeliveryTime: order.shopping_to_delivery_time
         }
+      end
+
+      # Add receipt information for admin users
+      if order.receipt_url.present?
+        begin
+          # Generate public URL for the receipt using S3Uploader
+          public_url = S3Uploader.public_url(order.receipt_url)
+          json[:receiptInfo] = {
+            receiptUrl: public_url,
+            uploadedAt: order.receipt_uploaded_at&.iso8601,
+            uploadedAgo: order.receipt_uploaded_at ? ActionController::Base.helpers.time_ago_in_words(order.receipt_uploaded_at) : nil
+          }
+        rescue => e
+          Rails.logger.error "Failed to generate receipt URL for order #{order.id}: #{e.message}"
+          # Don't include receipt info if URL generation fails
+        end
       end
     end
 

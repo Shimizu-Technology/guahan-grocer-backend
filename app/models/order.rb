@@ -90,6 +90,40 @@ class Order < ApplicationRecord
     time_in_status('delivering')
   end
 
+  # Additional performance metrics
+  def assignment_to_acceptance_time
+    assigned_event = timeline_events.find { |e| e.event_type == 'assigned' }
+    accepted_event = timeline_events.find { |e| e.event_type == 'accepted' }
+    
+    return nil unless assigned_event && accepted_event
+    
+    ((accepted_event.occurred_at - assigned_event.occurred_at) / 1.minute).round(2)
+  end
+
+  def acceptance_to_shopping_time
+    accepted_event = timeline_events.find { |e| e.event_type == 'accepted' }
+    shopping_event = timeline_events.find { |e| e.event_type == 'shopping_started' }
+    
+    return nil unless accepted_event && shopping_event
+    
+    ((shopping_event.occurred_at - accepted_event.occurred_at) / 1.minute).round(2)
+  end
+
+  def shopping_to_delivery_time
+    shopping_event = timeline_events.find { |e| e.event_type == 'shopping_completed' }
+    delivery_event = timeline_events.find { |e| e.event_type == 'delivery_started' }
+    
+    # If no shopping_completed event, use the last shopping event
+    unless shopping_event
+      receipt_event = timeline_events.find { |e| e.event_type == 'receipt_uploaded' }
+      shopping_event = receipt_event || timeline_events.find { |e| e.event_type == 'shopping_started' }
+    end
+    
+    return nil unless shopping_event && delivery_event
+    
+    ((delivery_event.occurred_at - shopping_event.occurred_at) / 1.minute).round(2)
+  end
+
   # Status transition helpers
   def last_status_change
     timeline_events.status_events.recent.first
@@ -221,26 +255,99 @@ class Order < ApplicationRecord
     old_status = saved_change_to_status[0]
     new_status = saved_change_to_status[1]
     
+    # Check if we have admin context from controller
+    status_changing_admin = instance_variable_get(:@assigning_admin)
+    
     # Create specific event types for major status changes
     case new_status
     when 'accepted'
-      add_event('accepted', driver, "Order was accepted by driver #{driver&.name}", { from_status: old_status, to_status: new_status })
+      if status_changing_admin
+        # Admin forced acceptance during assignment
+        add_event('accepted', status_changing_admin, nil, { 
+          from_status: old_status, 
+          to_status: new_status,
+          driver_name: driver&.name,
+          changed_by: status_changing_admin.name,
+          changed_by_role: status_changing_admin.role,
+          change_type: 'admin_assignment'
+        })
+      else
+        # Driver self-accepted
+        add_event('accepted', driver, nil, { 
+          from_status: old_status, 
+          to_status: new_status,
+          driver_name: driver&.name,
+          change_type: 'driver_action'
+        })
+      end
     when 'shopping'
-      add_event('shopping_started', driver, "Driver #{driver&.name} started shopping", { from_status: old_status, to_status: new_status })
+      add_event('shopping_started', driver, nil, { 
+        from_status: old_status, 
+        to_status: new_status,
+        driver_name: driver&.name,
+        change_type: 'driver_action'
+      })
     when 'delivering'
-      add_event('delivery_started', driver, "Driver #{driver&.name} started delivery", { from_status: old_status, to_status: new_status })
+      add_event('delivery_started', driver, nil, { 
+        from_status: old_status, 
+        to_status: new_status,
+        driver_name: driver&.name,
+        change_type: 'driver_action'
+      })
     when 'delivered'
-      add_event('delivered', driver, "Order was delivered by #{driver&.name}", { from_status: old_status, to_status: new_status })
+      add_event('delivered', driver, nil, { 
+        from_status: old_status, 
+        to_status: new_status,
+        driver_name: driver&.name,
+        change_type: 'driver_action'
+      })
     when 'cancelled'
-      add_event('cancelled', nil, "Order was cancelled", { from_status: old_status, to_status: new_status })
+      if status_changing_admin
+        add_event('cancelled', status_changing_admin, nil, { 
+          from_status: old_status, 
+          to_status: new_status,
+          changed_by: status_changing_admin.name,
+          changed_by_role: status_changing_admin.role,
+          change_type: 'admin_action'
+        })
+      else
+        add_event('cancelled', nil, "Order was cancelled", { 
+          from_status: old_status, 
+          to_status: new_status,
+          change_type: 'system'
+        })
+      end
     else
-      add_event('status_changed', nil, "Status changed from #{old_status} to #{new_status}", { from_status: old_status, to_status: new_status })
+      add_event('status_changed', nil, "Status changed from #{old_status} to #{new_status}", { 
+        from_status: old_status, 
+        to_status: new_status,
+        change_type: 'system'
+      })
     end
   end
 
   def create_driver_assignment_event
     if driver_id.present? && saved_change_to_driver_id[1].present?
-      add_event('assigned', nil, "Order was assigned to driver #{driver.name}", { driver_id: driver_id, driver_name: driver.name })
+      # Check if we have admin context from controller
+      assigning_admin = instance_variable_get(:@assigning_admin)
+      
+      if assigning_admin
+        # Admin assignment
+        add_event('assigned', assigning_admin, nil, { 
+          driver_id: driver_id, 
+          driver_name: driver.name,
+          assigned_by: assigning_admin.name,
+          assigned_by_role: assigning_admin.role,
+          assignment_type: 'admin'
+        })
+      else
+        # System or driver self-acceptance (fallback)
+        add_event('assigned', nil, "Order was assigned to driver #{driver.name}", { 
+          driver_id: driver_id, 
+          driver_name: driver.name,
+          assignment_type: 'system'
+        })
+      end
     end
   end
 end

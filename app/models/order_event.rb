@@ -16,7 +16,8 @@ class OrderEvent < ApplicationRecord
     delivered: 'delivered',
     cancelled: 'cancelled',
     status_changed: 'status_changed',
-    note_added: 'note_added'
+    note_added: 'note_added',
+    receipt_uploaded: 'receipt_uploaded'
   }
 
   validates :event_type, presence: true
@@ -26,7 +27,7 @@ class OrderEvent < ApplicationRecord
   # Scopes for common queries
   scope :recent, -> { order(occurred_at: :desc) }
   scope :for_timeline, -> { order(occurred_at: :asc) }
-  scope :status_events, -> { where(event_type: ['created', 'assigned', 'accepted', 'shopping_started', 'shopping_completed', 'delivery_started', 'delivered', 'cancelled']) }
+  scope :status_events, -> { where(event_type: ['created', 'assigned', 'accepted', 'shopping_started', 'shopping_completed', 'receipt_uploaded', 'delivery_started', 'delivered', 'cancelled']) }
   scope :by_user, ->(user) { where(user: user) }
 
   # Helper methods
@@ -60,11 +61,22 @@ class OrderEvent < ApplicationRecord
     when 'created'
       "Order was placed by #{order.user.name}"
     when 'assigned'
-      "Order was assigned to driver #{data[:driver_name] || user&.name}"
+      driver_name = data[:driver_name] || 'driver'
+      if data[:assignment_type] == 'admin' && data[:assigned_by]
+        "Admin #{data[:assigned_by]} assigned driver #{driver_name} to this order"
+      else
+        "Order was assigned to driver #{driver_name}"
+      end
     when 'accepted'
-      "Order was accepted by driver #{user&.name}"
+      if data[:change_type] == 'admin_assignment'
+        "Order automatically accepted when assigned by admin #{data[:changed_by]}"
+      else
+        driver_name = data[:driver_name] || user&.name || 'driver'
+        "Driver #{driver_name} accepted the order"
+      end
     when 'shopping_started'
-      "Driver #{user&.name} started shopping"
+      driver_name = data[:driver_name] || user&.name || 'Driver'
+      "#{driver_name} started shopping for the order"
     when 'item_found'
       "Item '#{data[:item_name]}' was found"
     when 'item_substituted'
@@ -72,17 +84,27 @@ class OrderEvent < ApplicationRecord
     when 'item_unavailable'
       "Item '#{data[:item_name]}' was marked as unavailable"
     when 'shopping_completed'
-      "Driver #{user&.name} completed shopping"
+      driver_name = user&.name || 'Driver'
+      "#{driver_name} completed shopping"
     when 'delivery_started'
-      "Driver #{user&.name} started delivery"
+      driver_name = data[:driver_name] || user&.name || 'Driver'
+      "#{driver_name} started delivery to customer"
     when 'delivered'
-      "Order was delivered by #{user&.name}"
+      driver_name = data[:driver_name] || user&.name || 'driver'
+      "Order was successfully delivered by #{driver_name}"
     when 'cancelled'
-      "Order was cancelled#{user ? " by #{user.name}" : ""}"
+      if data[:change_type] == 'admin_action'
+        "Order was cancelled by admin #{data[:changed_by]}"
+      else
+        "Order was cancelled#{user ? " by #{user.name}" : ""}"
+      end
     when 'status_changed'
       "Status changed from #{data[:from_status]} to #{data[:to_status]}"
     when 'note_added'
       "Note added: #{data[:note]}"
+    when 'receipt_uploaded'
+      driver_name = data[:driver_name] || user&.name || 'Driver'
+      "#{driver_name} uploaded store receipt"
     else
       "#{event_type.humanize} event occurred"
     end
