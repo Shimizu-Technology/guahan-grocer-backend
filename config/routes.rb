@@ -49,14 +49,15 @@ Rails.application.routes.draw do
         end
       end
       
-              resources :orders do
-          member do
-            put :assign_driver
-            put :status, to: 'orders#update_status'
-            put :accept, to: 'orders#accept_order'
-            post :receipt, to: 'orders#upload_receipt'
-          end
-          collection do
+      resources :orders do
+        member do
+          put :assign_driver
+          put :status, to: 'orders#update_status'
+          put :accept, to: 'orders#accept_order'
+          post :receipt, to: 'orders#upload_receipt'
+          get :timeline
+        end
+        collection do
             get :available
             get :active
             post :calculate_delivery_fee

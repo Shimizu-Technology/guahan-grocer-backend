@@ -285,6 +285,53 @@ class Api::V1::OrdersController < ApplicationController
     end
   end
 
+  # GET /api/v1/orders/:id/timeline
+  def timeline
+    ensure_order_access!(@order)
+    return if performed?
+
+    events = @order.timeline_events.includes(:user)
+    
+    timeline_data = events.map do |event|
+      {
+        id: event.id,
+        event_type: event.event_type,
+        description: event.description,
+        user: event.user ? {
+          id: event.user.id,
+          name: event.user.name,
+          role: event.user.role
+        } : nil,
+        user_name: event.user_name,
+        occurred_at: event.occurred_at.iso8601,
+        formatted_time: event.formatted_time,
+        time_ago: event.time_ago,
+        data: event.data
+      }
+    end
+
+    # Include performance metrics for completed orders
+    metrics = {}
+    if @order.delivered?
+      metrics = {
+        total_processing_time: @order.total_processing_time,
+        shopping_duration: @order.shopping_duration,
+        delivery_duration: @order.delivery_duration,
+        accepted_at: @order.accepted_at&.iso8601,
+        shopping_started_at: @order.shopping_started_at&.iso8601,
+        delivery_started_at: @order.delivery_started_at&.iso8601,
+        delivered_at: @order.delivered_at&.iso8601
+      }
+    end
+
+    render json: {
+      timeline: timeline_data,
+      metrics: metrics,
+      order_status: @order.status,
+      order_id: @order.id
+    }
+  end
+
   private
 
   def set_order
@@ -403,6 +450,33 @@ class Api::V1::OrdersController < ApplicationController
       if order.assigned_store
         json[:storeAddress] = order.assigned_store.address
         json[:storePhone] = order.assigned_store.phone
+      end
+    end
+    
+    # Add timeline information for detailed views (admins or when specifically requested)
+    if current_user.admin? || include_items
+      last_event = order.timeline_events.recent.first
+      json[:lastEvent] = last_event ? {
+        event_type: last_event.event_type,
+        description: last_event.description,
+        occurred_at: last_event.occurred_at.iso8601,
+        time_ago: last_event.time_ago,
+        user_name: last_event.user_name
+      } : nil
+      
+      # Add key timestamps for tracking
+      json[:acceptedAt] = order.accepted_at&.iso8601
+      json[:shoppingStartedAt] = order.shopping_started_at&.iso8601
+      json[:deliveryStartedAt] = order.delivery_started_at&.iso8601
+      json[:deliveredAt] = order.delivered_at&.iso8601
+      
+      # Add performance metrics for completed orders
+      if order.delivered?
+        json[:performanceMetrics] = {
+          totalProcessingTime: order.total_processing_time,
+          shoppingDuration: order.shopping_duration,
+          deliveryDuration: order.delivery_duration
+        }
       end
     end
     

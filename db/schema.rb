@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_02_135411) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_12_041700) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -74,6 +74,22 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_02_135411) do
     t.index ["product_id"], name: "index_favorites_on_product_id"
     t.index ["user_id", "product_id"], name: "index_favorites_on_user_id_and_product_id", unique: true
     t.index ["user_id"], name: "index_favorites_on_user_id"
+  end
+
+  create_table "order_events", force: :cascade do |t|
+    t.bigint "order_id", null: false
+    t.string "event_type", null: false
+    t.bigint "user_id"
+    t.jsonb "data", default: {}
+    t.datetime "occurred_at", null: false
+    t.text "description"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["event_type", "occurred_at"], name: "index_order_events_on_event_type_and_occurred_at"
+    t.index ["order_id", "occurred_at"], name: "index_order_events_on_order_id_and_occurred_at"
+    t.index ["order_id"], name: "index_order_events_on_order_id"
+    t.index ["user_id", "occurred_at"], name: "index_order_events_on_user_id_and_occurred_at", where: "(user_id IS NOT NULL)"
+    t.index ["user_id"], name: "index_order_events_on_user_id"
   end
 
   create_table "order_items", force: :cascade do |t|
@@ -224,6 +240,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_02_135411) do
   add_foreign_key "driver_stats", "users"
   add_foreign_key "favorites", "products"
   add_foreign_key "favorites", "users"
+  add_foreign_key "order_events", "orders"
+  add_foreign_key "order_events", "users"
   add_foreign_key "order_items", "orders"
   add_foreign_key "order_items", "products"
   add_foreign_key "order_items", "products", column: "substitute_product_id"
