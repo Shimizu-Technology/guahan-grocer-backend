@@ -1,6 +1,6 @@
 # Abstract interface for all payment service implementations
 # This ensures consistent API across mock and real payment services
-class Payment::PaymentServiceInterface
+module Payment::PaymentServiceInterface
   # Create a payment intent for the given amount
   # @param amount [Decimal] The amount to charge in dollars
   # @param metadata [Hash] Additional data to attach to the payment

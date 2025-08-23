@@ -1,6 +1,7 @@
 # Mock payment service for development and testing
 # Simulates payment processing without actually charging cards
-class Payment::MockPaymentService < Payment::PaymentServiceInterface
+class Payment::MockPaymentService
+  include Payment::PaymentServiceInterface
   include ActiveSupport::Benchmarkable
   
   def initialize
