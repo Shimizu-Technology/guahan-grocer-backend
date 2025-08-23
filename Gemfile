@@ -30,7 +30,7 @@ gem "image_processing", "~> 1.2"
 gem "rack-cors"
 
 # Stripe for payment processing
-gem "stripe", "~> 10.0"
+gem "stripe", "~> 15.4"
 
 # HTTP client for API requests
 gem "httparty"
