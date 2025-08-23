@@ -1,5 +1,5 @@
 class Api::V1::ProductsController < ApplicationController
-  before_action :set_product, only: [:show, :update, :destroy, :upload_image, :delete_image]
+  before_action :set_product, only: [:show, :update, :destroy, :upload_image, :delete_image, :weight_info]
   
   # Skip authentication for public product viewing
   skip_before_action :authenticate_user!, only: [:index, :show, :featured]
@@ -145,6 +145,32 @@ class Api::V1::ProductsController < ApplicationController
     end
   end
 
+  # GET /api/v1/products/:id/weight_info
+  def weight_info
+    unless @product.weight_based?
+      render json: { error: 'Product is not weight-based' }, status: :bad_request
+      return
+    end
+
+    render json: {
+      id: @product.id.to_s,
+      name: @product.name,
+      weightBased: @product.weight_based?,
+      pricePerUnit: @product.price_per_unit.to_f,
+      weightUnit: @product.weight_unit,
+      minWeight: @product.min_weight&.to_f,
+      maxWeight: @product.max_weight&.to_f,
+      weightRange: @product.weight_range_text,
+      priceInfo: @product.display_price_info,
+      sampleCalculations: {
+        "0.5" => @product.calculate_price_for_weight(0.5),
+        "1.0" => @product.calculate_price_for_weight(1.0),
+        "1.5" => @product.calculate_price_for_weight(1.5),
+        "2.0" => @product.calculate_price_for_weight(2.0)
+      }
+    }
+  end
+
   private
 
   def set_product
@@ -172,7 +198,10 @@ class Api::V1::ProductsController < ApplicationController
       featured: product.featured,
       trackInventory: product.track_inventory,
       stockStatus: product.display_stock_status,
-      available: product.available?
+      available: product.available?,
+      weightBased: product.weight_based?,
+      weightUnit: product.weight_based? ? product.weight_unit : nil,
+      pricePerUnit: product.weight_based? ? product.price_per_unit.to_f : nil
     }
 
     # Add image information
@@ -185,7 +214,7 @@ class Api::V1::ProductsController < ApplicationController
     end
 
     if detailed
-      json.merge!({
+      detailed_info = {
         description: product.description,
         createdAt: product.created_at.iso8601,
         updatedAt: product.updated_at.iso8601,
@@ -193,7 +222,19 @@ class Api::V1::ProductsController < ApplicationController
         outOfStock: product.out_of_stock?,
         hasImage: product.has_image?,
         actualStockQuantity: product.track_inventory? ? product.stock_quantity : nil
-      })
+      }
+      
+      # Add weight-based details
+      if product.weight_based?
+        detailed_info.merge!({
+          minWeight: product.min_weight&.to_f,
+          maxWeight: product.max_weight&.to_f,
+          weightRange: product.weight_range_text,
+          priceInfo: product.display_price_info
+        })
+      end
+      
+      json.merge!(detailed_info)
     end
 
     json

@@ -46,6 +46,7 @@ Rails.application.routes.draw do
         member do
           post :upload_image, to: 'products#upload_image'
           delete :delete_image, to: 'products#delete_image'
+          get :weight_info
         end
       end
       
@@ -56,6 +57,10 @@ Rails.application.routes.draw do
           put :accept, to: 'orders#accept_order'
           post :receipt, to: 'orders#upload_receipt'
           get :timeline
+          # Weight variance endpoints
+          put 'items/:item_id/weight', to: 'orders#update_item_weight'
+          post 'items/:item_id/approve_variance', to: 'orders#approve_variance'
+          post 'items/:item_id/reject_variance', to: 'orders#reject_variance'
         end
         collection do
             get :available
@@ -74,7 +79,11 @@ Rails.application.routes.draw do
       end
 
       # User management
-      resources :users, only: [:index, :show, :create, :update, :destroy]
+      resources :users, only: [:index, :show, :create, :update, :destroy] do
+        resource :preferences, controller: 'user_preferences', only: [:show, :update] do
+          get :variance_settings
+        end
+      end
       get 'drivers/available', to: 'users#available_drivers'
 
       # Favorites
@@ -95,6 +104,28 @@ Rails.application.routes.draw do
         member do
           put :toggle_active
         end
+      end
+
+      # Payment routes
+      scope 'orders/:order_id/payments' do
+        post :authorize, to: 'payments#authorize'
+        post :capture, to: 'payments#capture'
+        post :cancel, to: 'payments#cancel'
+        get :status, to: 'payments#status'
+        post :variance_refund, to: 'payments#process_variance_refund'
+      end
+      
+      scope 'payments' do
+        get :service_status, to: 'payments#service_status'
+        post :calculate_pre_auth, to: 'payments#calculate_pre_auth'
+      end
+
+      # Stripe payment routes
+      scope 'stripe' do
+        post :create_intent, to: 'stripe#create_intent'
+        get 'payment_intent/:id', to: 'stripe#payment_intent'
+        post :confirm_intent, to: 'stripe#confirm_intent'
+        post :webhook, to: 'stripe#webhook'
       end
 
       # Admin routes

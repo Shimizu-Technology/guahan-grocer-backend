@@ -21,6 +21,17 @@ class User < ApplicationRecord
   validates :name, presence: true
   validates :phone, presence: true, format: { with: /\A[\+]?[0-9\-\(\)\s]+\z/ }
   validates :role, presence: true
+  
+  # Weight variance preference validations
+  validates :max_auto_variance_percentage, 
+    inclusion: { in: 0..30, message: "must be between 0 and 30 percent" },
+    allow_nil: true
+  validates :approval_timeout_minutes,
+    inclusion: { in: 1..60, message: "must be between 1 and 60 minutes" },
+    allow_nil: true
+  validates :variance_notification_method,
+    inclusion: { in: %w[push sms email], message: "must be push, sms, or email" },
+    allow_blank: true
 
   # Address helper methods
   def default_address

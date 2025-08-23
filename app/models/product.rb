@@ -4,6 +4,12 @@ class Product < ApplicationRecord
   validates :price, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :stock_quantity, presence: true, numericality: { greater_than_or_equal_to: 0 }, if: :track_inventory?
   validates :track_inventory, inclusion: { in: [true, false] }
+  validates :weight_based, inclusion: { in: [true, false] }
+  validates :price_per_unit, presence: true, numericality: { greater_than: 0 }, if: :weight_based?
+  validates :weight_unit, presence: true, length: { maximum: 20 }, if: :weight_based?
+  validates :min_weight, numericality: { greater_than: 0 }, allow_nil: true, if: :weight_based?
+  validates :max_weight, numericality: { greater_than: 0 }, allow_nil: true, if: :weight_based?
+  validate :max_weight_greater_than_min_weight, if: :weight_based?
 
   # Associations
   belongs_to :unit
@@ -24,6 +30,8 @@ class Product < ApplicationRecord
   scope :tracked_inventory, -> { where(track_inventory: true) }
   scope :unlimited_stock, -> { where(track_inventory: false) }
   scope :featured, -> { where(featured: true) }
+  scope :weight_based, -> { where(weight_based: true) }
+  scope :fixed_price, -> { where(weight_based: false) }
 
   # Image handling methods
   def image_url
@@ -205,6 +213,92 @@ class Product < ApplicationRecord
     unless track_inventory?
       self.stock_quantity = 0
       self.in_stock = true
+    end
+  end
+
+  # Weight-based product methods
+  def weight_based?
+    weight_based == true
+  end
+  
+  def fixed_price?
+    !weight_based?
+  end
+  
+  # Calculate price for a given weight
+  def calculate_price_for_weight(weight)
+    return price unless weight_based?
+    
+    (price_per_unit * weight).round(2)
+  end
+  
+  # Get estimated price for display (uses price field as base weight for weight-based items)
+  def display_price_info
+    if weight_based?
+      base_weight = 1.0 # Default to 1 unit for display
+      estimated_price = calculate_price_for_weight(base_weight)
+      
+      {
+        is_weight_based: true,
+        price_per_unit: price_per_unit,
+        weight_unit: weight_unit,
+        estimated_price: estimated_price,
+        display_text: "$#{price_per_unit}/#{weight_unit}"
+      }
+    else
+      {
+        is_weight_based: false,
+        fixed_price: price,
+        display_text: "$#{price}"
+      }
+    end
+  end
+  
+  # Check if a weight is within acceptable range
+  def weight_in_range?(weight)
+    return true unless weight_based?
+    
+    within_min = min_weight.nil? || weight >= min_weight
+    within_max = max_weight.nil? || weight <= max_weight
+    
+    within_min && within_max
+  end
+  
+  # Get weight range text for display
+  def weight_range_text
+    return nil unless weight_based?
+    
+    if min_weight && max_weight
+      "#{min_weight} - #{max_weight} #{weight_unit}"
+    elsif min_weight
+      "Min #{min_weight} #{weight_unit}"
+    elsif max_weight
+      "Max #{max_weight} #{weight_unit}"
+    else
+      "Any weight"
+    end
+  end
+  
+  # Calculate variance percentage between two weights
+  def calculate_weight_variance(original_weight, new_weight)
+    return 0 if original_weight == 0 || !weight_based?
+    
+    ((new_weight - original_weight) / original_weight * 100).round(2)
+  end
+  
+  # Get weight unit display
+  def weight_unit_display
+    weight_based? ? weight_unit : unit&.abbreviation
+  end
+
+  private
+
+  # Custom validation for weight range
+  def max_weight_greater_than_min_weight
+    return unless min_weight && max_weight
+    
+    if max_weight <= min_weight
+      errors.add(:max_weight, "must be greater than minimum weight")
     end
   end
 

@@ -29,6 +29,9 @@ gem "image_processing", "~> 1.2"
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 gem "rack-cors"
 
+# Stripe for payment processing
+gem "stripe", "~> 10.0"
+
 # HTTP client for API requests
 gem "httparty"
 
@@ -40,7 +43,6 @@ gem "jwt" # JWT token authentication
 
 # AWS & External Services
 gem "aws-sdk-s3" # AWS S3 integration
-gem "stripe" # Stripe payment integration
 
 # Background Jobs
 gem "sidekiq" # Background job processing

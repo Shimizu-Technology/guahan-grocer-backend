@@ -1,5 +1,5 @@
 class Api::V1::OrdersController < ApplicationController
-  before_action :set_order, only: [:show, :update_status, :assign_driver, :accept_order, :timeline, :upload_receipt]
+  before_action :set_order, only: [:show, :update_status, :assign_driver, :accept_order, :timeline, :upload_receipt, :update_item_weight, :approve_variance, :reject_variance]
 
   # GET /api/v1/orders
   def index
@@ -401,6 +401,117 @@ class Api::V1::OrdersController < ApplicationController
     }
   end
 
+  # PUT /api/v1/orders/:id/items/:item_id/weight
+  def update_item_weight
+    ensure_order_management!(@order)
+    return if performed?
+
+    order_item = @order.order_items.find(params[:item_id])
+    new_weight = params[:weight].to_f
+    driver_note = params[:note]
+
+    unless order_item.weight_based?
+      render json: { errors: ['Order item is not weight-based'] }, status: :bad_request
+      return
+    end
+
+    unless new_weight > 0
+      render json: { errors: ['Weight must be greater than 0'] }, status: :bad_request
+      return
+    end
+
+    if order_item.update_actual_weight!(new_weight, driver_note)
+      # Try auto-approval
+      order_item.auto_approve_variance_if_eligible
+
+      render json: {
+        success: true,
+        message: 'Weight updated successfully',
+        orderItem: order_item_json(order_item),
+        varianceInfo: order_item.weight_display_info,
+        needsApproval: order_item.needs_customer_approval?,
+        autoApproved: order_item.variance_approved == true
+      }
+    else
+      render json: { 
+        errors: order_item.errors.full_messages 
+      }, status: :unprocessable_entity
+    end
+
+  rescue ActiveRecord::RecordNotFound
+    render json: { errors: ['Order item not found'] }, status: :not_found
+  end
+
+  # POST /api/v1/orders/:id/items/:item_id/approve_variance
+  def approve_variance
+    ensure_customer_access!(@order)
+    return if performed?
+
+    order_item = @order.order_items.find(params[:item_id])
+
+    unless order_item.weight_based? && order_item.variance_percentage.present?
+      render json: { errors: ['No weight variance to approve'] }, status: :bad_request
+      return
+    end
+
+    if order_item.variance_approved.present?
+      render json: { errors: ['Variance already decided'] }, status: :bad_request
+      return
+    end
+
+    order_item.approve_variance!('manual')
+
+    # Update any pending variance approval records
+    order_item.weight_variance_approvals.pending_approval.each do |approval|
+      approval.approve!('manual')
+    end
+
+    render json: {
+      success: true,
+      message: 'Variance approved successfully',
+      orderItem: order_item_json(order_item),
+      varianceInfo: order_item.weight_display_info
+    }
+
+  rescue ActiveRecord::RecordNotFound
+    render json: { errors: ['Order item not found'] }, status: :not_found
+  end
+
+  # POST /api/v1/orders/:id/items/:item_id/reject_variance
+  def reject_variance
+    ensure_customer_access!(@order)
+    return if performed?
+
+    order_item = @order.order_items.find(params[:item_id])
+
+    unless order_item.weight_based? && order_item.variance_percentage.present?
+      render json: { errors: ['No weight variance to reject'] }, status: :bad_request
+      return
+    end
+
+    if order_item.variance_approved.present?
+      render json: { errors: ['Variance already decided'] }, status: :bad_request
+      return
+    end
+
+    order_item.reject_variance!('manual')
+
+    # Update any pending variance approval records
+    order_item.weight_variance_approvals.pending_approval.each do |approval|
+      approval.reject!('manual')
+    end
+
+    render json: {
+      success: true,
+      message: 'Variance rejected successfully',
+      orderItem: order_item_json(order_item),
+      varianceInfo: order_item.weight_display_info
+    }
+
+  rescue ActiveRecord::RecordNotFound
+    render json: { errors: ['Order item not found'] }, status: :not_found
+  end
+
   private
 
   def set_order
@@ -410,7 +521,7 @@ class Api::V1::OrdersController < ApplicationController
   end
 
   def order_params
-    params.require(:order).permit(:total, :subtotal, :delivery_fee, :actual_delivery_fee, :eta, :estimated_payout, :tip_amount, :tip_percentage, :delivery_instructions, :delivery_time, :assigned_store_id, :store_distance_miles, :store_name, :estimated_delivery_minutes, delivery_address: {})
+    params.require(:order).permit(:total, :subtotal, :delivery_fee, :actual_delivery_fee, :eta, :estimated_payout, :tip_amount, :tip_percentage, :delivery_instructions, :delivery_time, :assigned_store_id, :store_distance_miles, :store_name, :estimated_delivery_minutes, :payment_intent_id, delivery_address: {})
   end
 
   def create_order_items(order, items_data)
@@ -470,6 +581,7 @@ class Api::V1::OrdersController < ApplicationController
       subtotal: order.subtotal.to_f,
       deliveryFee: order.delivery_fee.to_f,
       actualDeliveryFee: order.actual_delivery_fee&.to_f,
+      finalTotal: order.final_total&.to_f,
       assigned: order.driver_id.present?
     }
     
@@ -603,7 +715,7 @@ class Api::V1::OrdersController < ApplicationController
 
   def order_item_json(order_item)
     product = order_item.product
-    {
+    json = {
       id: order_item.id.to_s,
       itemId: order_item.product_id.to_s,
       product: {
@@ -612,15 +724,45 @@ class Api::V1::OrdersController < ApplicationController
         price: product.price.to_f,
         unit: product.unit&.name || 'unit',
         image_url: product.image_url,
-        category: product.product_categories.includes(:category).first&.category&.name || 'General'
+        category: product.product_categories.includes(:category).first&.category&.name || 'General',
+        weightBased: product.weight_based?,
+        weightUnit: product.weight_based? ? product.weight_unit : nil,
+        pricePerUnit: product.weight_based? ? product.price_per_unit.to_f : nil
       },
       quantity: order_item.quantity,
       price: order_item.price.to_f,
       status: order_item.status,
       foundQuantity: order_item.found_quantity,
       notes: order_item.notes,
-      substituteItem: order_item.substitute_product&.id&.to_s
+      substituteItem: order_item.substitute_product&.id&.to_s,
+      finalPrice: order_item.final_price.to_f,
+      lineTotal: order_item.line_total.to_f
     }
+
+    # Add weight variance information for weight-based items
+    if order_item.weight_based?
+      weight_info = order_item.weight_display_info || {}
+      json.merge!({
+        weightInfo: {
+          estimatedWeight: weight_info[:estimated_weight]&.to_f,
+          actualWeight: weight_info[:actual_weight]&.to_f,
+          weightUnit: weight_info[:weight_unit],
+          estimatedPrice: weight_info[:estimated_price]&.to_f,
+          actualPrice: weight_info[:actual_price]&.to_f,
+          variancePercentage: weight_info[:variance_percentage]&.to_f,
+          varianceApproved: weight_info[:variance_approved],
+          weightVerified: weight_info[:weight_verified],
+          needsApproval: weight_info[:needs_approval],
+          weightVariance: order_item.weight_variance.to_f,
+          priceVariance: order_item.price_variance.to_f,
+          varianceApprovalMethod: order_item.variance_approval_method,
+          weightVerifiedAt: order_item.weight_verified_at&.iso8601,
+          substitutionReason: order_item.substitution_reason
+        }
+      })
+    end
+
+    json
   end
 
   def calculate_driver_details(order)

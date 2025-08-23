@@ -17,7 +17,14 @@ class OrderEvent < ApplicationRecord
     cancelled: 'cancelled',
     status_changed: 'status_changed',
     note_added: 'note_added',
-    receipt_uploaded: 'receipt_uploaded'
+    receipt_uploaded: 'receipt_uploaded',
+    # Weight variance events
+    weight_updated: 'weight_updated',
+    variance_auto_approved: 'variance_auto_approved',
+    variance_approval_requested: 'variance_approval_requested',
+    variance_approved: 'variance_approved',
+    variance_rejected: 'variance_rejected',
+    variance_timeout: 'variance_timeout'
   }
 
   validates :event_type, presence: true
@@ -28,6 +35,7 @@ class OrderEvent < ApplicationRecord
   scope :recent, -> { order(occurred_at: :desc) }
   scope :for_timeline, -> { order(occurred_at: :asc) }
   scope :status_events, -> { where(event_type: ['created', 'assigned', 'accepted', 'shopping_started', 'shopping_completed', 'receipt_uploaded', 'delivery_started', 'delivered', 'cancelled']) }
+  scope :variance_events, -> { where(event_type: ['weight_updated', 'variance_auto_approved', 'variance_approval_requested', 'variance_approved', 'variance_rejected', 'variance_timeout']) }
   scope :by_user, ->(user) { where(user: user) }
 
   # Helper methods
@@ -105,6 +113,39 @@ class OrderEvent < ApplicationRecord
     when 'receipt_uploaded'
       driver_name = data[:driver_name] || user&.name || 'Driver'
       "#{driver_name} uploaded store receipt"
+    when 'weight_updated'
+      driver_name = user&.name || 'Driver'
+      item_name = data[:item_name] || 'item'
+      old_weight = data[:old_weight]
+      new_weight = data[:new_weight]
+      weight_unit = data[:weight_unit] || 'lbs'
+      if old_weight
+        "#{driver_name} updated #{item_name} weight from #{old_weight} #{weight_unit} to #{new_weight} #{weight_unit}"
+      else
+        "#{driver_name} weighed #{item_name}: #{new_weight} #{weight_unit}"
+      end
+    when 'variance_auto_approved'
+      item_name = data[:item_name] || 'item'
+      variance_percentage = data[:variance_percentage]
+      "#{item_name} weight variance (#{variance_percentage}%) was automatically approved"
+    when 'variance_approval_requested'
+      item_name = data[:item_name] || 'item'
+      variance_percentage = data[:variance_percentage]
+      "Customer approval requested for #{item_name} weight variance (#{variance_percentage}%)"
+    when 'variance_approved'
+      customer_name = user&.name || 'Customer'
+      item_name = data[:item_name] || 'item'
+      variance_percentage = data[:variance_percentage]
+      "#{customer_name} approved #{item_name} weight variance (#{variance_percentage}%)"
+    when 'variance_rejected'
+      customer_name = user&.name || 'Customer'
+      item_name = data[:item_name] || 'item'
+      variance_percentage = data[:variance_percentage]
+      "#{customer_name} rejected #{item_name} weight variance (#{variance_percentage}%)"
+    when 'variance_timeout'
+      item_name = data[:item_name] || 'item'
+      variance_percentage = data[:variance_percentage]
+      "#{item_name} weight variance (#{variance_percentage}%) approval timed out"
     else
       "#{event_type.humanize} event occurred"
     end

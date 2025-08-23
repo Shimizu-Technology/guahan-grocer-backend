@@ -69,6 +69,13 @@ class ApplicationController < ActionController::API
     end
   end
 
+  def ensure_customer_access!(order)
+    # Ensure the current user is the customer who placed the order or an admin
+    unless current_user&.admin? || order.user == current_user
+      render json: { errors: ['Not authorized to access this order'] }, status: :forbidden
+    end
+  end
+
   # Scope methods that work reliably without autoloading
   def orders_scope
     return Order.all if current_user.admin?

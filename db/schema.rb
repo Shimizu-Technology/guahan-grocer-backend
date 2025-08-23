@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_12_041700) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_23_060833) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -103,11 +103,23 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_12_041700) do
     t.bigint "substitute_product_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.decimal "estimated_weight", precision: 8, scale: 3
+    t.decimal "actual_weight", precision: 8, scale: 3
+    t.decimal "estimated_price", precision: 10, scale: 2
+    t.decimal "actual_price", precision: 10, scale: 2
+    t.decimal "variance_percentage", precision: 5, scale: 2
+    t.boolean "variance_approved"
+    t.string "variance_approval_method", limit: 50
+    t.text "substitution_reason"
+    t.datetime "weight_verified_at", precision: nil
+    t.boolean "weight_based"
     t.index ["order_id", "status"], name: "index_order_items_on_order_id_and_status"
     t.index ["order_id"], name: "index_order_items_on_order_id"
     t.index ["product_id", "order_id"], name: "index_order_items_on_product_id_and_order_id", comment: "For product-order joins"
     t.index ["product_id"], name: "index_order_items_on_product_id"
     t.index ["substitute_product_id"], name: "index_order_items_on_substitute_product_id"
+    t.index ["variance_approved"], name: "index_order_items_on_variance_approved"
+    t.index ["weight_verified_at"], name: "index_order_items_on_weight_verified_at"
   end
 
   create_table "orders", force: :cascade do |t|
@@ -133,11 +145,20 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_12_041700) do
     t.integer "estimated_delivery_minutes"
     t.string "receipt_url"
     t.datetime "receipt_uploaded_at"
+    t.decimal "estimated_total", precision: 10, scale: 2
+    t.decimal "pre_auth_amount", precision: 10, scale: 2
+    t.decimal "final_total", precision: 10, scale: 2
+    t.string "payment_intent_id"
+    t.string "payment_status", default: "pending", null: false
+    t.string "payment_method", default: "mock", null: false
+    t.jsonb "variance_summary"
     t.index ["assigned_store_id", "status"], name: "index_orders_on_assigned_store_id_and_status", comment: "For store-specific order management"
     t.index ["assigned_store_id"], name: "index_orders_on_assigned_store_id"
     t.index ["created_at"], name: "index_orders_on_created_at", comment: "For order history and analytics queries"
     t.index ["driver_id", "status"], name: "index_orders_on_driver_id_and_status", where: "(driver_id IS NOT NULL)"
     t.index ["driver_id"], name: "index_orders_on_driver_id"
+    t.index ["payment_intent_id"], name: "index_orders_on_payment_intent_id", unique: true
+    t.index ["payment_status"], name: "index_orders_on_payment_status"
     t.index ["status", "created_at"], name: "index_orders_on_status_and_created_at", comment: "For filtering orders by status with time ordering"
     t.index ["tip_amount"], name: "index_orders_on_tip_amount"
     t.index ["user_id", "status", "created_at"], name: "index_orders_on_user_id_and_status_and_created_at"
@@ -166,9 +187,15 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_12_041700) do
     t.bigint "unit_id", null: false
     t.boolean "featured", default: false
     t.boolean "track_inventory", default: true, null: false
+    t.boolean "weight_based", default: false, null: false
+    t.decimal "price_per_unit", precision: 10, scale: 2
+    t.string "weight_unit", limit: 20
+    t.decimal "min_weight", precision: 8, scale: 3
+    t.decimal "max_weight", precision: 8, scale: 3
     t.index ["stock_quantity"], name: "index_products_on_stock_quantity", where: "(stock_quantity <= 10)"
     t.index ["track_inventory"], name: "index_products_on_track_inventory"
     t.index ["unit_id"], name: "index_products_on_unit_id"
+    t.index ["weight_based"], name: "index_products_on_weight_based"
   end
 
   create_table "sms_messages", force: :cascade do |t|
@@ -215,6 +242,12 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_12_041700) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "is_online", default: false, null: false
+    t.boolean "auto_approve_variances", default: false, null: false
+    t.integer "max_auto_variance_percentage", default: 15, null: false
+    t.boolean "auto_approve_overages_only", default: false, null: false
+    t.string "variance_notification_method", limit: 50, default: "push", null: false
+    t.integer "approval_timeout_minutes", default: 10, null: false
+    t.index ["auto_approve_variances"], name: "index_users_on_auto_approve_variances"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["role", "active"], name: "index_users_on_role_and_active"
     t.index ["role", "is_online"], name: "index_users_on_role_and_is_online"
@@ -236,6 +269,26 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_12_041700) do
     t.index ["verification_status"], name: "index_vehicles_on_verification_status"
   end
 
+  create_table "weight_variance_approvals", force: :cascade do |t|
+    t.bigint "order_item_id", null: false
+    t.decimal "original_weight", precision: 8, scale: 3
+    t.decimal "new_weight", precision: 8, scale: 3
+    t.decimal "original_price", precision: 10, scale: 2
+    t.decimal "new_price", precision: 10, scale: 2
+    t.decimal "variance_percentage", precision: 5, scale: 2
+    t.string "approval_status", limit: 50, default: "pending", null: false
+    t.string "approval_method", limit: 50
+    t.datetime "customer_response_at", precision: nil
+    t.datetime "timeout_at", precision: nil
+    t.text "driver_note"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["approval_status"], name: "index_weight_variance_approvals_on_approval_status"
+    t.index ["order_item_id", "approval_status"], name: "idx_on_order_item_id_approval_status_06110b7a2a"
+    t.index ["order_item_id"], name: "index_weight_variance_approvals_on_order_item_id"
+    t.index ["timeout_at"], name: "index_weight_variance_approvals_on_timeout_at"
+  end
+
   add_foreign_key "addresses", "users"
   add_foreign_key "driver_stats", "users"
   add_foreign_key "favorites", "products"
@@ -252,4 +305,5 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_12_041700) do
   add_foreign_key "product_categories", "products"
   add_foreign_key "products", "units"
   add_foreign_key "vehicles", "users"
+  add_foreign_key "weight_variance_approvals", "order_items"
 end
