@@ -180,44 +180,26 @@ class DistanceCalculator
 
     # Optimized store finding that minimizes API calls
     def find_closest_store_optimized(stores, customer_address)
-      # If we only have a few stores, check distances with caching (no artificial delays)
-      if stores.count <= 3
-        closest_store = nil
-        shortest_distance = Float::INFINITY
+      # Always calculate actual distances for accuracy
+      # The village-based optimization was causing incorrect store selection
+      closest_store = nil
+      shortest_distance = Float::INFINITY
 
-        stores.each do |store|
-          distance_data = calculate_distance(store.full_address, customer_address)
-          next unless distance_data
+      stores.each do |store|
+        distance_data = calculate_distance(store.full_address, customer_address)
+        next unless distance_data
 
-          if distance_data[:distance_miles] < shortest_distance
-            shortest_distance = distance_data[:distance_miles]
-            closest_store = store
-          end
+        if distance_data[:distance_miles] < shortest_distance
+          shortest_distance = distance_data[:distance_miles]
+          closest_store = store
         end
-
-        return closest_store
       end
 
-      # For many stores, use geographic approximation first
-      # Most Guam addresses contain village names that can help identify the closest area
-      customer_village = extract_village_from_address(customer_address)
-      
-      if customer_village
-        # Try to find a store in or near the same village
-        preferred_store = stores.find do |store|
-          store.address&.downcase&.include?(customer_village.downcase) ||
-          store.name&.downcase&.include?(customer_village.downcase)
-        end
-        
-        return preferred_store if preferred_store
-      end
-
-      # Fallback: just use the first available store
-      # The background job will calculate the accurate closest store later
-      stores.first
+      closest_store
     end
 
     # Extract village name from Guam address for geographic approximation
+    # NOTE: Currently unused after fixing store selection to use actual distances
     def extract_village_from_address(address)
       # Common Guam villages
       villages = %w[
