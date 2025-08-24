@@ -180,7 +180,7 @@ class Api::V1::ProductsController < ApplicationController
   end
 
   def product_params
-    params.require(:product).permit(:name, :price, :unit_id, :description, :in_stock, :stock_quantity, :featured, :track_inventory, :image, category_ids: [])
+    params.require(:product).permit(:name, :price, :unit_id, :description, :in_stock, :stock_quantity, :featured, :track_inventory, :image, :weight_based, :price_per_unit, :weight_unit, :min_weight, :max_weight, category_ids: [])
   end
 
   def product_json(product, detailed: false)
