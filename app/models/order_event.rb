@@ -83,7 +83,7 @@ class OrderEvent < ApplicationRecord
         "Driver #{driver_name} accepted the order"
       end
     when 'shopping_started'
-      driver_name = data[:driver_name] || user&.name || 'Driver'
+      driver_name = data[:driver_name] || user&.name || order.driver&.name || 'Driver'
       "#{driver_name} started shopping for the order"
     when 'item_found'
       "Item '#{data[:item_name]}' was found"
@@ -92,10 +92,10 @@ class OrderEvent < ApplicationRecord
     when 'item_unavailable'
       "Item '#{data[:item_name]}' was marked as unavailable"
     when 'shopping_completed'
-      driver_name = user&.name || 'Driver'
+      driver_name = data[:driver_name] || user&.name || order.driver&.name || 'Driver'
       "#{driver_name} completed shopping"
     when 'delivery_started'
-      driver_name = data[:driver_name] || user&.name || 'Driver'
+      driver_name = data[:driver_name] || user&.name || order.driver&.name || 'Driver'
       "#{driver_name} started delivery to customer"
     when 'delivered'
       driver_name = data[:driver_name] || user&.name || 'driver'
@@ -111,10 +111,10 @@ class OrderEvent < ApplicationRecord
     when 'note_added'
       "Note added: #{data[:note]}"
     when 'receipt_uploaded'
-      driver_name = data[:driver_name] || user&.name || 'Driver'
+      driver_name = data[:driver_name] || user&.name || order.driver&.name || 'Driver'
       "#{driver_name} uploaded store receipt"
     when 'weight_updated'
-      driver_name = user&.name || 'Driver'
+      driver_name = data[:driver_name] || user&.name || order.driver&.name || 'Driver'
       item_name = data[:item_name] || 'item'
       old_weight = data[:old_weight]
       new_weight = data[:new_weight]
@@ -133,12 +133,12 @@ class OrderEvent < ApplicationRecord
       variance_percentage = data[:variance_percentage]
       "Customer approval requested for #{item_name} weight variance (#{variance_percentage}%)"
     when 'variance_approved'
-      customer_name = user&.name || 'Customer'
+      customer_name = data[:customer_name] || user&.name || order.user&.name || 'Customer'
       item_name = data[:item_name] || 'item'
       variance_percentage = data[:variance_percentage]
       "#{customer_name} approved #{item_name} weight variance (#{variance_percentage}%)"
     when 'variance_rejected'
-      customer_name = user&.name || 'Customer'
+      customer_name = data[:customer_name] || user&.name || order.user&.name || 'Customer'
       item_name = data[:item_name] || 'item'
       variance_percentage = data[:variance_percentage]
       "#{customer_name} rejected #{item_name} weight variance (#{variance_percentage}%)"

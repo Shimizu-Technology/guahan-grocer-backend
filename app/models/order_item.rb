@@ -106,7 +106,8 @@ class OrderItem < ApplicationRecord
         weight_unit: product.weight_unit,
         estimated_weight: estimated_weight,
         variance_percentage: variance_percentage,
-        driver_note: driver_note
+        driver_note: driver_note,
+        driver_name: order.driver&.name
       })
       
       # Auto-approve if eligible
@@ -213,7 +214,8 @@ class OrderItem < ApplicationRecord
         estimated_price: estimated_price,
         actual_price: actual_price,
         price_difference: actual_price - estimated_price,
-        approval_method: method
+        approval_method: method,
+        customer_name: order.user&.name
       })
     end
     
@@ -239,7 +241,8 @@ class OrderItem < ApplicationRecord
       estimated_price: estimated_price,
       actual_price: actual_price,
       price_difference: actual_price - estimated_price,
-      approval_method: method
+      approval_method: method,
+      customer_name: order.user&.name
     })
     
     # Send notification
