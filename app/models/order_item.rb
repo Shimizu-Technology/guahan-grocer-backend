@@ -125,6 +125,9 @@ class OrderItem < ApplicationRecord
     return false unless variance_percentage.present?
     return false unless variance_approved.nil? # Already approved or rejected
     
+    # No approval needed for 0% variance
+    return false if variance_percentage == 0
+    
     customer = order.user
     abs_variance = variance_percentage.abs
     
