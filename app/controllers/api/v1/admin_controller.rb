@@ -12,6 +12,103 @@ class Api::V1::AdminController < ApplicationController
     }
   end
 
+  # POST /api/v1/admin/update_weight_based_products
+  def update_weight_based_products
+    begin
+      # Define weight-based products with their pricing
+      weight_based_products = [
+        {
+          name: 'Cucumber',
+          price_per_unit: 4.79,
+          weight_unit: 'lb',
+          min_weight: 0.5,
+          max_weight: 5.0
+        },
+        {
+          name: 'Carrots', 
+          price_per_unit: 1.19,
+          weight_unit: 'lb',
+          min_weight: 0.5,
+          max_weight: 5.0
+        },
+        {
+          name: 'Baby Bokchoy',
+          price_per_unit: 2.19,
+          weight_unit: 'lb', 
+          min_weight: 0.5,
+          max_weight: 3.0
+        },
+        {
+          name: 'Yellow Onions',
+          price_per_unit: 0.89,
+          weight_unit: 'lb',
+          min_weight: 0.5,
+          max_weight: 5.0
+        },
+        {
+          name: 'Red Onions',
+          price_per_unit: 1.39,
+          weight_unit: 'lb',
+          min_weight: 0.5,
+          max_weight: 5.0
+        },
+        {
+          name: 'White Onions',
+          price_per_unit: 1.49,
+          weight_unit: 'lb',
+          min_weight: 0.5,
+          max_weight: 5.0
+        },
+        {
+          name: 'Large Tomatos',
+          price_per_unit: 1.49,
+          weight_unit: 'lb',
+          min_weight: 0.5,
+          max_weight: 5.0
+        },
+        {
+          name: 'Red Leaf Lettuce',
+          price_per_unit: 3.29,
+          weight_unit: 'lb',
+          min_weight: 0.5,
+          max_weight: 2.0
+        }
+      ]
+
+      updated_count = 0
+      not_found = []
+
+      weight_based_products.each do |product_data|
+        product = Product.find_by(name: product_data[:name])
+        
+        if product
+          product.update!(
+            weight_based: true,
+            price_per_unit: product_data[:price_per_unit],
+            weight_unit: product_data[:weight_unit],
+            min_weight: product_data[:min_weight],
+            max_weight: product_data[:max_weight]
+          )
+          updated_count += 1
+        else
+          not_found << product_data[:name]
+        end
+      end
+
+      render json: {
+        success: true,
+        message: "Updated #{updated_count} products as weight-based",
+        updated_count: updated_count,
+        not_found: not_found
+      }
+    rescue => e
+      render json: {
+        success: false,
+        error: e.message
+      }, status: :internal_server_error
+    end
+  end
+
   # GET /api/v1/admin/sms_report
   def sms_report
     spending_report = SmsCostOptimizer.daily_spending_report

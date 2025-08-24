@@ -132,6 +132,7 @@ Rails.application.routes.draw do
       namespace :admin do
         get :dashboard
         get :sms_report
+        post :update_weight_based_products
       end
     end
   end
