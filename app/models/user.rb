@@ -2,7 +2,7 @@ class User < ApplicationRecord
   has_secure_password
 
   # Associations as specified in the plan
-  has_many :orders, dependent: :destroy
+  has_many :orders  # Keep orders for analytics - handle in account deletion logic
   has_many :driver_orders, class_name: 'Order', foreign_key: 'driver_id'
   has_many :favorites, dependent: :destroy
   has_many :favorite_products, through: :favorites, source: :product

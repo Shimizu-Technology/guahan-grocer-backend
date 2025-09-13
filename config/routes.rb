@@ -35,6 +35,7 @@ Rails.application.routes.draw do
         post :register
         get :me
         delete :logout
+        delete :delete_account
         put :toggle_online
       end
 

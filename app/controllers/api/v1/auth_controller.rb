@@ -53,6 +53,52 @@ class Api::V1::AuthController < ApplicationController
     render json: { message: 'Logged out successfully' }, status: :ok
   end
 
+  # DELETE /api/v1/auth/delete_account
+  def delete_account
+    user = current_user
+    
+    # Check if user has any active orders
+    if user.orders.where(status: ['pending', 'confirmed', 'in_progress', 'out_for_delivery']).exists?
+      render json: { 
+        errors: ['Cannot delete account with active orders. Please wait for all orders to be completed or cancelled.'] 
+      }, status: :unprocessable_entity
+      return
+    end
+    
+    # For drivers, check if they have any active assignments
+    if user.driver? && user.driver_orders.where(status: ['confirmed', 'in_progress', 'out_for_delivery']).exists?
+      render json: { 
+        errors: ['Cannot delete account with active delivery assignments. Please complete all deliveries first.'] 
+      }, status: :unprocessable_entity
+      return
+    end
+    
+    # Soft delete by deactivating the account and anonymizing data
+    begin
+      User.transaction do
+        # Anonymize user data for privacy compliance
+        user.update!(
+          name: "Deleted User #{user.id}",
+          email: "deleted_#{user.id}@deleted.local",
+          phone: "000-000-0000",
+          active: false,
+          password: SecureRandom.hex(32) # Reset password to random value
+        )
+        
+        # Clear any personal data in related records
+        user.addresses.destroy_all
+        user.favorites.destroy_all
+        
+        # Orders are preserved with anonymized user data for business analytics
+        # The orders still reference the user_id but user is now anonymized
+      end
+      
+      render json: { message: 'Account deleted successfully' }, status: :ok
+    rescue => e
+      render json: { errors: ['Failed to delete account. Please try again.'] }, status: :internal_server_error
+    end
+  end
+
 
 
   # PUT /api/v1/auth/toggle_online
