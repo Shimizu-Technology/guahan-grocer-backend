@@ -10,6 +10,11 @@ class Product < ApplicationRecord
   validates :min_weight, numericality: { greater_than: 0 }, allow_nil: true, if: :weight_based?
   validates :max_weight, numericality: { greater_than: 0 }, allow_nil: true, if: :weight_based?
   validate :max_weight_greater_than_min_weight, if: :weight_based?
+  
+  # Open Food Facts validations
+  validates :gtin, uniqueness: true, allow_nil: true
+  validates :nutriscore_grade, inclusion: { in: %w[A B C D E], allow_nil: true }, 
+            length: { maximum: 1 }
 
   # Associations
   belongs_to :unit
@@ -289,6 +294,149 @@ class Product < ApplicationRecord
   # Get weight unit display
   def weight_unit_display
     weight_based? ? weight_unit : unit&.abbreviation
+  end
+
+  # Open Food Facts helper methods
+  def has_gtin?
+    gtin.present?
+  end
+
+  def has_enhanced_data?
+    has_gtin? || brand.present? || nutrition_data.present? || image_urls.any? || 
+    serving_size.present? || ingredients_text.present? || off_categories.present?
+  end
+
+  def primary_image_url
+    # Prefer Open Food Facts images, fallback to existing image_url
+    if image_urls.any?
+      image_urls.first
+    else
+      image_url
+    end
+  end
+
+  def all_image_urls
+    # Combine Open Food Facts images with existing image
+    urls = image_urls.dup || []
+    urls << image_url if image_url.present? && !urls.include?(image_url)
+    urls << image_ingredients_url if image_ingredients_url.present?
+    urls << image_nutrition_url if image_nutrition_url.present?
+    urls.compact.uniq
+  end
+
+  def has_nutrition_data?
+    nutrition_data.present? && nutrition_data.any?
+  end
+
+  def calories_per_100g
+    return nil unless has_nutrition_data?
+    nutrition_data['energy_kcal_100g']
+  end
+
+  def ingredients_list
+    ingredients_text.presence || (nutrition_data&.dig('ingredients_text'))
+  end
+
+  def allergens_list
+    allergens.presence
+  end
+
+  # Enhanced helper methods for new fields
+  def has_allergen_info?
+    allergens.present? || traces.present?
+  end
+
+  def has_health_scores?
+    nutriscore_grade.present? || nova_group.present?
+  end
+
+  def nutriscore_display
+    return nil unless nutriscore_grade.present?
+    nutriscore_grade.upcase
+  end
+
+  def nova_display
+    return nil unless nova_group.present?
+    case nova_group
+    when 1 then "Unprocessed"
+    when 2 then "Processed culinary ingredients"
+    when 3 then "Processed foods"
+    when 4 then "Ultra-processed foods"
+    else "Unknown"
+    end
+  end
+
+  def categories_list
+    return [] unless off_categories.present?
+    off_categories.split(',').map(&:strip)
+  end
+
+  def labels_list
+    return [] unless off_labels.present?
+    off_labels.split(',').map(&:strip)
+  end
+
+  def has_multiple_images?
+    all_image_urls.length > 1
+  end
+
+  def is_food_product?
+    # Heuristic: if it has nutrition data, allergens, or food-related categories, it's likely food
+    has_nutrition_data? || allergens.present? || 
+    (off_categories.present? && off_categories.match?(/food|drink|beverage|snack|meal/i))
+  end
+
+  # Class methods for Open Food Facts integration
+  def self.find_by_gtin(gtin)
+    find_by(gtin: gtin) if gtin.present?
+  end
+
+  def self.create_from_open_food_facts(gtin, admin_price = nil)
+    return nil if gtin.blank?
+
+    # Check if product already exists
+    existing_product = find_by_gtin(gtin)
+    return existing_product if existing_product
+
+    # Fetch from Open Food Facts
+    product_data = OpenFoodFactsService.fetch_by_gtin(gtin)
+    return nil unless product_data
+
+    # Create new product with all Open Food Facts data
+    create!(
+      # Basic info
+      gtin: product_data[:gtin],
+      name: product_data[:name] || "Product #{gtin}",
+      brand: product_data[:brand],
+      size: product_data[:size],
+      description: product_data[:description],
+      
+      # Enhanced fields (all optional)
+      serving_size: product_data[:serving_size],
+      ingredients_text: product_data[:ingredients_text],
+      allergens: product_data[:allergens],
+      traces: product_data[:traces],
+      off_categories: product_data[:off_categories],
+      off_labels: product_data[:off_labels],
+      nutriscore_grade: product_data[:nutriscore_grade],
+      nova_group: product_data[:nova_group],
+      packaging: product_data[:packaging],
+      
+      # Images
+      image_urls: product_data[:image_urls] || [],
+      image_ingredients_url: product_data[:image_ingredients_url],
+      image_nutrition_url: product_data[:image_nutrition_url],
+      
+      # Existing fields
+      nutrition_data: product_data[:nutrition_data] || {},
+      price: admin_price || 0.0, # Admin must set price
+      track_inventory: false, # Default to unlimited stock
+      weight_based: false, # Default to fixed price
+      unit: Unit.find_by(name: 'Each') || Unit.first # Default unit
+    )
+  rescue ActiveRecord::RecordInvalid => e
+    Rails.logger.error "Failed to create product from Open Food Facts: #{e.message}"
+    nil
   end
 
   private

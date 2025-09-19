@@ -134,6 +134,15 @@ Rails.application.routes.draw do
         get :dashboard
         get :sms_report
         post :update_weight_based_products
+        
+        # Barcode scanning and product management
+        post :scan_product
+        post :create_product
+        get :products
+        get 'products/:id', action: :product
+        delete 'products/:id', action: :delete_product
+        post 'products/:id/enhance', action: :enhance_product
+        post 'products/:id/apply_enhancements', action: :apply_enhancements
       end
     end
   end

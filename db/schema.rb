@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_23_060833) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_18_004716) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -192,6 +192,29 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_23_060833) do
     t.string "weight_unit", limit: 20
     t.decimal "min_weight", precision: 8, scale: 3
     t.decimal "max_weight", precision: 8, scale: 3
+    t.string "gtin"
+    t.string "brand"
+    t.string "size"
+    t.json "nutrition_data"
+    t.text "image_urls", default: [], array: true
+    t.string "serving_size"
+    t.text "ingredients_text"
+    t.string "allergens"
+    t.string "traces"
+    t.text "off_categories"
+    t.text "off_labels"
+    t.string "nutriscore_grade", limit: 1
+    t.integer "nova_group"
+    t.string "image_ingredients_url"
+    t.string "image_nutrition_url"
+    t.string "packaging"
+    t.index ["allergens"], name: "index_products_on_allergens", where: "(allergens IS NOT NULL)"
+    t.index ["brand"], name: "index_products_on_brand"
+    t.index ["gtin"], name: "index_products_on_gtin", unique: true
+    t.index ["nova_group"], name: "index_products_on_nova_group", where: "(nova_group IS NOT NULL)"
+    t.index ["nutriscore_grade"], name: "index_products_on_nutriscore_grade", where: "(nutriscore_grade IS NOT NULL)"
+    t.index ["off_categories"], name: "index_products_on_off_categories", where: "(off_categories IS NOT NULL)"
+    t.index ["off_labels"], name: "index_products_on_off_labels", where: "(off_labels IS NOT NULL)"
     t.index ["stock_quantity"], name: "index_products_on_stock_quantity", where: "(stock_quantity <= 10)"
     t.index ["track_inventory"], name: "index_products_on_track_inventory"
     t.index ["unit_id"], name: "index_products_on_unit_id"

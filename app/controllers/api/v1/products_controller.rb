@@ -204,10 +204,41 @@ class Api::V1::ProductsController < ApplicationController
       pricePerUnit: product.weight_based? ? product.price_per_unit.to_f : nil
     }
 
-    # Add image information
-    if product.has_image?
-      json[:imageUrl] = product.image_url
+    # Add enhanced Open Food Facts data
+    if product.has_enhanced_data?
+      json[:enhanced] = {
+        brand: product.brand,
+        size: product.size,
+        gtin: product.gtin,
+        servingSize: product.serving_size,
+        ingredients: product.ingredients_list,
+        allergens: product.allergens_list,
+        traces: product.traces,
+        packaging: product.packaging,
+        nutriscoreGrade: product.nutriscore_display,
+        novaGroup: product.nova_group,
+        novaDisplay: product.nova_display,
+        hasNutritionData: product.has_nutrition_data?,
+        hasAllergenInfo: product.has_allergen_info?,
+        hasHealthScores: product.has_health_scores?,
+        isFoodProduct: product.is_food_product?,
+        caloriesPer100g: product.calories_per_100g
+      }
+    end
+
+    # Add image information (enhanced with multiple images)
+    if product.has_image? || product.has_enhanced_data?
+      json[:imageUrl] = product.primary_image_url
       json[:images] = product.image_info
+      
+      # Enhanced image data for products with multiple images
+      if product.has_multiple_images?
+        json[:enhanced] ||= {}
+        json[:enhanced][:imageUrls] = product.all_image_urls
+        json[:enhanced][:imageIngredientsUrl] = product.image_ingredients_url
+        json[:enhanced][:imageNutritionUrl] = product.image_nutrition_url
+        json[:enhanced][:hasMultipleImages] = true
+      end
     else
       json[:imageUrl] = nil
       json[:images] = nil
