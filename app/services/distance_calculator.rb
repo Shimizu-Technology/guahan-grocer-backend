@@ -20,7 +20,8 @@ class DistanceCalculator
   }.freeze
 
   # Get corrected address if known problematic pattern is detected
-  def self.get_corrected_address(address)
+  def self.get_corrected_address(address, skip_village_normalization: false)
+    # First check for specific problematic patterns
     PROBLEMATIC_ADDRESS_CORRECTIONS.each do |pattern, correction|
       if address.match?(pattern)
         Rails.logger.info "Address correction applied: '#{address}' → '#{correction}'"
@@ -33,13 +34,26 @@ class DistanceCalculator
       end
     end
     
+    # Apply Guam village name normalization only if not already done
+    unless skip_village_normalization
+      normalized_address = GuamVillageMapper.normalize_address(address)
+      if normalized_address != address
+        return {
+          corrected_address: normalized_address,
+          original_address: address,
+          correction_applied: true,
+          reason: "Village name normalized to standard format"
+        }
+      end
+    end
+    
     { corrected_address: address, correction_applied: false }
   end
 
   # Comprehensive delivery calculation that returns fee, store, and error status
-  def self.calculate_delivery_with_details(customer_address)
+  def self.calculate_delivery_with_details(customer_address, skip_village_normalization: false)
     # Apply address correction first
-    correction_result = get_corrected_address(customer_address)
+    correction_result = get_corrected_address(customer_address, skip_village_normalization: skip_village_normalization)
     final_address = correction_result[:corrected_address]
     
     # Find closest store (only call this once!)

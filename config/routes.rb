@@ -26,6 +26,13 @@ Rails.application.routes.draw do
         end
       end
       
+      # Address validation
+      namespace :address_validation do
+        post :validate
+        get :village_suggestions
+        post :normalize
+      end
+      
       # Categories and Units management
       resources :categories, only: [:index, :create, :show, :update, :destroy]
       resources :units, only: [:index, :create, :show, :update, :destroy]

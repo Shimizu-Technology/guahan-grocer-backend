@@ -232,16 +232,19 @@ class Api::V1::OrdersController < ApplicationController
     end
 
     begin
-      # Format address string
-      address_string = format_delivery_address(delivery_address)
+      # Apply village name normalization to the hash first
+      normalized_delivery_address = GuamVillageMapper.normalize_address(delivery_address)
       
-      # Apply address correction if needed
-      correction_result = DistanceCalculator.get_corrected_address(address_string)
+      # Format address string
+      address_string = format_delivery_address(normalized_delivery_address)
+      
+      # Apply other address corrections if needed (but skip village normalization since we already did it)
+      correction_result = DistanceCalculator.get_corrected_address(address_string, skip_village_normalization: true)
       final_address = correction_result[:corrected_address]
       
       # Calculate delivery details with timeout
       delivery_result = Timeout::timeout(10) do
-        DistanceCalculator.calculate_delivery_with_details(final_address)
+        DistanceCalculator.calculate_delivery_with_details(final_address, skip_village_normalization: true)
       end
       
       # Prepare response data
