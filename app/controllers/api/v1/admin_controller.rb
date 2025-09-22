@@ -261,18 +261,10 @@ class Api::V1::AdminController < ApplicationController
       )
     end
     
-    # Paginate
-    products = products.page(page).per(per_page)
+    # For now, return all products without pagination since frontend doesn't handle it
+    # TODO: Implement proper pagination in frontend
     
-    render json: {
-      products: products.map { |p| format_product_for_admin(p) },
-      pagination: {
-        current_page: page,
-        per_page: per_page,
-        total_pages: products.total_pages,
-        total_count: products.total_count
-      }
-    }
+    render json: products.map { |p| format_product_for_admin(p) }
   end
 
   # GET /api/v1/admin/products/:id
@@ -595,6 +587,13 @@ class Api::V1::AdminController < ApplicationController
           gtin: product.gtin,
           price: product.price,
           description: product.description,
+          
+          # Category information
+          category: product.categories.first&.name,
+          categories: product.categories.map { |cat| { id: cat.id, name: cat.name } },
+          
+          # Unit information
+          unit: product.unit&.name,
           
           # Enhanced Open Food Facts data
           serving_size: product.serving_size,
