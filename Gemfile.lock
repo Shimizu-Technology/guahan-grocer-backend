@@ -154,7 +154,7 @@ GEM
       net-imap
       net-pop
       net-smtp
-    marcel (1.0.4)
+    marcel (1.1.0)
     mini_magick (5.3.0)
       logger
     mini_mime (1.1.5)
